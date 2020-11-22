@@ -1,6 +1,6 @@
 # TypeScript Form Validator
 
-* **Initiuve fluent interface for declaring rules**
+* **Initiative fluent interface for declaring rules**
 * **i18next intergration for simple rich validation messages**
 * **Immutable datastructure meant to be used in React applications**
 * **Type safe to reduce bugs and allow easy coding**
