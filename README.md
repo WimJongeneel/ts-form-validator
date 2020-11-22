@@ -102,7 +102,7 @@ To clear all error you can call `clear` on the `ValidatorState` and get a valida
 
 ## Examples
 
-See `src/index.tsx` for a longer example. The example form has three fields, one gets validated on submit, one gets validated on typing and one gets validated on submit and clears on type.
+See `src/index.tsx` for a longer example. The example form has three fields, one gets validated on submit, one gets validated on typing and one gets validated on submit and clears on type. You can run the example by cloning this repro and using `yarn start`.
 
 > todo:
 > - document all rules for the different types
