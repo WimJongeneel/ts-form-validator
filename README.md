@@ -11,7 +11,7 @@
 * A validator get created for a type
 * A validator has a state
 * This state is an immutable data structure
-* This state exposes methods for running the validator, retrieving and modifing
+* This state exposes methods for validating, retrieving and modifing the state
 
 ## Creating validators
 
@@ -99,3 +99,10 @@ i18next.init({
 ## Clearing errors
 
 To clear all error you can call `clear` on the `ValidatorState` and get a validator state with no errors inside. Note that this state will return `true` for `error` as the validator hasn't ran yet. Alternatifly you can provide `clear` with a fieldname and it will then only clear the error of that field. This is very useful for clear-errors-as-you-type forms. If you call `validate` with no argument to validate all fields all existing errors will be cleared
+
+## Examples
+
+See `src/index.tsx` for a longer example. The example form has three fields, one gets validated on submit, one gets validated on typing and one gets validated on submit and clears on type.
+
+> todo:
+> - document all rules for the different types
