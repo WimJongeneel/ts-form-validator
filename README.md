@@ -1,6 +1,6 @@
 # TypeScript Form Validator
 
-* **Initiuve fluent interface for declaring rules**
+* **Initiative fluent interface for declaring rules**
 * **i18next intergration for simple rich validation messages**
 * **Immutable datastructure meant to be used in React applications**
 * **Type safe to reduce bugs and allow easy coding**
@@ -8,7 +8,7 @@
 
 ## Design priciples
 
-* A validator get created for a type
+* A validator is created for a type
 * A validator has a state
 * This state is an immutable data structure
 * This state exposes methods for validating, retrieving and modifing the state
@@ -95,6 +95,7 @@ i18next.init({
 > todo:
 > - list all the labels and arguments
 > - translate the fieldnames
+> - allow i18next namespacing to be used
 
 ## Clearing errors
 
