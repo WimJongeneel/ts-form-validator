@@ -110,22 +110,19 @@ type Rules<a> = Partial<{ [k in keyof a]: (b: Builder<a[k]>) => Rule<a[k]> }>
 
 // todo: maybe add result as readonly field for easier debugging in react dev tools?
 export interface ValidatorState<a> {
+    // todo: type to Map<keyof a, Result>
     fields(): Map<string, Result>
     field(field: keyof a): Result | null
     message(field: keyof a): string | null
     clear(field?: keyof a): ValidatorState<a>
     validate(data: a, field?: keyof a): ValidatorState<a>
-    error(field: keyof a): boolean
+    error(field?: keyof a): boolean
 }
 
 export const validator = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
     return {
-        field() {
-            return null
-        },
-        message() {
-            return null
-        },
+        field: () => null,
+        message: () => null,
         clear() {
             return this
         },
@@ -142,11 +139,10 @@ export const validator = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             return validatorFromResult(rules, newResults)
         },
         error(field) {
-            return rules[field] != null
+            if(field) return rules[field] != null
+            return Object.keys(rules).length != 0
         },
-        fields() {
-            return new Map()
-        }
+        fields: () => new Map()
     }
 }
 
@@ -171,6 +167,7 @@ const validatorFromResult = <a = {}>(rules: Rules<a>, results: Map<string, Resul
         if(results.has(field.toString())) {
             const data = results.get(field.toString())
             if(data.kind == 'passed') return null
+            // todo: type translation data object
             // @ts-ignore
             return i18next.default.t(data.name, {...data.data, field, kind: data.name})
         } 
@@ -189,7 +186,5 @@ const validatorFromResult = <a = {}>(rules: Rules<a>, results: Map<string, Resul
         }
         return validatorFromResult(rules, newResults)
     },
-    fields() {
-        return new Map(results.entries())
-    }
+    fields:() => new Map(results.entries())
 })
