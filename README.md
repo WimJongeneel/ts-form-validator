@@ -8,7 +8,7 @@
 
 ## Design priciples
 
-* A validator get created for a type
+* A validator is created for a type
 * A validator has a state
 * This state is an immutable data structure
 * This state exposes methods for validating, retrieving and modifing the state
