@@ -95,6 +95,7 @@ i18next.init({
 > todo:
 > - list all the labels and arguments
 > - translate the fieldnames
+> - allow i18next namespacing to be used
 
 ## Clearing errors
 
