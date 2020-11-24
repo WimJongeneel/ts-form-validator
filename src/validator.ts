@@ -6,17 +6,8 @@ interface Rule<a> {
     run: (v: a) => Result
 }
 
-// todo: move this to specifix types
-interface RuleBuilder {
-    is(s: number): Rule<number>
-    is(s: Date): Rule<Date>
-    required: Rule<string>
-    oneOf(s: string, ...as: string[]): Rule<string>
-    oneOf(s: boolean, ...as: boolean[]): Rule<boolean>
-    oneOf(s: number, ...as: number[]): Rule<number>
-}
-
 interface StringRuleBuilder {
+    required: Rule<string>
     is(s: string): Rule<string>
     min: (n: number) => Rule<string>
     max: (n: number) => Rule<string>
@@ -39,7 +30,9 @@ interface StringRuleBuilder {
 }
 
 interface DateRuleBuilder {
+    is(s: Date): Rule<Date>
     afterOr: (d: Date) => Rule<Date>
+    oneOf(s: Date, ...as: Date[]): Rule<Date>
     after: (d: Date) => Rule<Date>
     before: (d: Date) => Rule<Date>
     beforeOr: (d: Date) => Rule<Date>
@@ -49,8 +42,18 @@ interface DateRuleBuilder {
 
 interface BoolRuleBuilder {
     is:(s: boolean) => Rule<boolean>
+    oneOf(s: boolean, ...as: boolean[]): Rule<boolean>
     true: Rule<boolean>
     false: Rule<boolean>
+}
+
+interface NumberRuleBuilder {
+    is(s: number): Rule<number>
+    oneOf(s: number, ...as: number[]): Rule<number>
+    bigger: (n:number) => Rule<number>
+    biggerOr: (n:number) => Rule<number>
+    lesser: (n:number) => Rule<number>
+    lesserOr: (n:number) => Rule<number>
 }
 
 type Builder<a> = 
@@ -87,19 +90,19 @@ const rule = <a>(p: (a:a) => Result): Rule<a> => ({
     },
 })
 
-const ruleBuilder: DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder & RuleBuilder = {
-    is: (v: any) => rule(a => v == a ? passed : failed('is', {expected: v, given: a, kind: 'is'})),
-    max: n => rule(a => n >= a.length ? passed : failed('max', {expected: n, given: a, length: a.length})),
-    min: n => rule(a => n <= a.length ? passed : failed('min', {expected: n, given: a, length: a.length,})),
-    hasCapital: rule(a => a.toLocaleLowerCase() != a ? passed : failed('hasCapital', {given: a})),
-    alphaNumeric: rule(a => /^[a-z0-9]+$/i.test(a) ? passed : failed('alphaNumeric', {given: a})),
-    oneOf: (...vs: string[]) => rule(a => vs.some(v => v == a) ? passed :failed('oneOf', {given: a, expected: vs.join(', ')})),
+const ruleBuilder: DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder & NumberRuleBuilder = {
+    is: (v:any) => rule(a => v == a ? passed : failed('is', {expected: v, given: a, kind: 'is'})),
+    max: (n:number) => rule((a:string) => n >= a.length ? passed : failed('max', {expected: n, given: a, length: a.length})),
+    min: (n:number) => rule((a:string) => n <= a.length ? passed : failed('min', {expected: n, given: a, length: a.length,})),
+    hasCapital: rule((a:string) => a.toLocaleLowerCase() != a ? passed : failed('hasCapital', {given: a})),
+    alphaNumeric: rule((a:string) => /^[a-z0-9]+$/i.test(a) ? passed : failed('alphaNumeric', {given: a})),
+    oneOf: (...vs: any[]) => rule(a => vs.some(v => v == a) ? passed :failed('oneOf', {given: a, expected: vs.join(', ')})),
     required: rule<string>(a => !!!a ? passed : failed('required')),
     false: rule(b => b === false ? passed : failed('false')),
     true: rule(b => b === true ? passed : failed('true')),
-    email: rule(e => e.includes('@') ? passed : failed('email', {given: e})),
+    email: rule((e:string) => e.includes('@') ? passed : failed('email', {given: e})),
     // todo: implement all other rules
-} as DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder & RuleBuilder
+} as any // DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder & NumberRuleBuilder
 
 interface rule {
     field: string
