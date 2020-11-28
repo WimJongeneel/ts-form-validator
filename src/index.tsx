@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { validator, ValidatorState } from "./validator";
+import { ValidatorState, validatorState, __ValidatorState } from "./validator";
 import i18next = require("i18next");
 
 i18next.default.init({
@@ -25,7 +25,7 @@ interface FormData {
   accept: boolean
 }
 
-const initValidatorState = validator<FormData>({
+const initValidatorState = validatorState<FormData>({
   accept: b => b.is(true),
   firstname: b => b.alphaNumeric.and(b.min(2)).and(b.max(255)),
   lastname: b => b.alphaNumeric.and(b.min(2)).and(b.max(255)),
@@ -45,6 +45,8 @@ class Form extends React.Component<{}, FormState> {
   }
 
   render() {
+    console.log(this.state.validator)
+
     return (
       <form noValidate onSubmit={e => {
         e.preventDefault()
@@ -76,7 +78,7 @@ class Form extends React.Component<{}, FormState> {
               this.setState(s => ({
                 ...s, 
                 data: {...s.data, lastname},
-                validator: s.validator.validate(s.data, 'lastname')
+                // validator: s.validator.validate(s.data, 'lastname')
               }))
             }}
           />
@@ -95,7 +97,7 @@ class Form extends React.Component<{}, FormState> {
               this.setState(s => ({
                 ...s, 
                 data: {...s.data, email},
-                validator: s.validator.clear('email')
+                // validator: s.validator.clear('email')
               }))
             }}
           />

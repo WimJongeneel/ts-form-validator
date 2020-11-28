@@ -1,4 +1,7 @@
 import i18next = require("i18next");
+import React = require("react");
+import { Widget, Action, fromJSX, nothing } from "widgets-for-react"
+import { Map } from 'immutable'
 
 interface Rule<a> {
     and: (r: Rule<a>) => Rule<a>
@@ -69,7 +72,7 @@ type Result =
 const passed: Result = {kind: 'passed'}
 
 const failed = (name: string, data: object = {}): Result => ({
-    kind: 'failed', name, data
+    kind: 'failed', name, data: {...data, name}
 })
 
 const rule = <a>(p: (a:a) => Result): Rule<a> => ({
@@ -104,90 +107,148 @@ const ruleBuilder: DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder & Numbe
     // todo: implement all other rules
 } as any // DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder & NumberRuleBuilder
 
-interface rule {
-    field: string
-    rule: Rule<any>
-}
-
 type Rules<a> = Partial<{ [k in keyof a]: (b: Builder<a[k]>) => Rule<a[k]> }>
 
-// todo: maybe add result as readonly field for easier debugging in react dev tools?
-export interface ValidatorState<a> {
-    // todo: type to Map<keyof a, Result>
-    fields(): Map<string, Result>
-    field(field: keyof a): Result | null
-    message(field: keyof a): string | null
-    clear(field?: keyof a): ValidatorState<a>
-    validate(data: a, field?: keyof a): ValidatorState<a>
-    error(field?: keyof a): boolean
-}
+interface BaseFieldState<a> {
+    /**
+     * Run the validation rule for this field
+     * @param data      the data for the field
+     * @param delay     delay the validation
+     */
+    validate(data: a, delay?: number): FieldState<a>
+    
+    /**
+     * Has this field passed the validation rule?
+     */
+    passed(): boolean
+    
+    /**
+     * The validation rule for this field
+     */
+    rule: Rule<a>
 
-export const validator = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
-    return {
-        field: () => null,
-        message: () => null,
-        clear() {
-            return this
-        },
-        validate(data: a, field?: keyof a) {
-            if(field != null && rules[field] == null) return this
-            if(field != null) {
-                const newResults = new Map<string, Result>()
-                newResults.set(field.toString(), rules[field](ruleBuilder as any).run(data[field]))
-                return validatorFromResult(rules, newResults)
-            }
-            
-            const newResults = new Map<string, Result>()
-            for(const r in rules) newResults.set(r.toString(), rules[r](ruleBuilder as any).run(data[r]))
-            return validatorFromResult(rules, newResults)
-        },
-        error(field) {
-            if(field) return rules[field] != null
-            return Object.keys(rules).length != 0
-        },
-        fields: () => new Map()
+    /**
+     * Clears the validation result for this field
+     * note: to clear running jobs, schedule new job that returns passed result
+     */
+    clear(): FieldState<a>
+
+    /**
+     * Holds the state for async validators
+     */
+    jobs: {
+        /**
+         * Reference to the current running job
+         */
+        current?: Promise<Result>
+        /**
+         * The job to be ran next, after the current job completes
+         */
+        next?: () => Promise<Result>
     }
 }
 
-const validatorFromResult = <a = {}>(rules: Rules<a>, results: Map<string, Result>): ValidatorState<a> => ({
-    clear: (field) => {
-        if(field == null) return validatorFromResult(rules, new Map())
-        const newResults = new Map<string, Result>(results.entries())
-        console.log(newResults)
-        newResults.delete(field.toString())
-        return validatorFromResult(rules, newResults)
+export type FieldState<a> = BaseFieldState<a> & (
+    | { kind: 'unvalidated' }
+    | { kind: 'validating', job: () => Promise<Result> }
+    | { kind: 'validated', result: Result })
+
+export interface ValidatorState<a> {
+    /**
+     * Contains the state of all the field of a
+     */
+    fields: Partial<{ [k in keyof a]: FieldState<a> }>
+
+    /**
+     * Get the translated error message for a field
+     * Returns null if there is no error for the specified field
+     * @param field the name of the field
+     */
+    message(field: keyof a): string | null
+    
+    /**
+     * Validate all fields
+     * @param data  the data to validate
+     * @param delay the delay for showing the error
+     */
+    validate(data: a, delay?: number): ValidatorState<a>
+
+    kind(): 'unvalidated' | 'validating' | 'partially validated' | 'validated'
+
+    error(field: keyof a): boolean
+}
+
+const unvalidated = <a>(rule: Rule<a>): FieldState<a> => ({
+    kind: 'unvalidated',
+    rule,
+    // todo: keep old jobs
+    jobs: {},
+    clear() {
+        // clear jobs
+        // todo: seperate clear updater?
+        return unvalidated(this.rule)
     },
-    field(field) {
-        if(results.has(field.toString())) return results.get(field.toString())
+    passed() {
+        return this.kind == 'validated' && this.result.kind == 'passed'
     },
-    error(field) {
-        if(field == null) return results.size != 0
-        if(rules[field] == null) return false
-        if(results.has(field.toString()) == false) return true
-        return results.get(field.toString()).kind == 'failed'
-    },
-    message(field) {
-        if(results.has(field.toString())) {
-            const data = results.get(field.toString())
-            if(data.kind == 'passed') return null
+    validate(data: a) {
+        // todo: add logic for async validating
+        return validated(this, data)
+    }
+})
+
+const validated = <a>(a: FieldState<a>, data: a): FieldState<a> => ({
+    ...a,
+    kind: 'validated',
+    result: a.rule.run(data),
+})
+
+export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
+    
+    const fields: Partial<{ [k in keyof a]: FieldState<a> }> = {}
+
+    for(const k in rules) {
+        fields[k] = unvalidated(rules[k](ruleBuilder as any) as any)
+    }
+
+    return {
+        fields,
+        kind() {
+            const s: ValidatorState<a> = this
+
+            // todo: add logic for validating and partially (if needed?)
+            for(const k in s.fields) {
+                console.log(s.fields[k])
+                if(s.fields[k].kind != 'validated') return 'unvalidated'
+            }
+
+            return 'validated'
+        },
+        message(k) {
+            const s: ValidatorState<a> = this
+            const data: FieldState<a[typeof k]> = s.fields[k] as any
+            if(data.kind != 'validated') return null
+            if(data.result.kind == 'passed') return null
             // todo: type translation data object
             // @ts-ignore
-            return i18next.default.t(data.name, {...data.data, field, kind: data.name})
-        } 
-    },
-    validate(data, field) {
-        if(field != null && rules[field] == null) return this
-        if(field != null) {
-            const newResults = new Map<string, Result>(results.entries())
-            newResults.set(field.toString(), rules[field](ruleBuilder as any).run(data[field]))
-            return validatorFromResult(rules, newResults)
+            return i18next.default.t(data.result.name, {...data.result.data, field: k, kind: data.result.name})
+        },
+        validate(data: a) {
+            const newS: ValidatorState<a> = {...this}
+
+            for(const k in newS.fields) {
+                newS.fields[k] = newS.fields[k].validate(data[k] as any)
+            }
+
+            return newS
+        },
+        error(k) {
+            const s: ValidatorState<a> = this
+            const field = s.fields[k]
+
+            if(field == null) return false
+            if(field.kind != 'validated') return false
+            return !field.passed()
         }
-        
-        const newResults = new Map<string, Result>()
-        for(const r in rules) {
-            newResults.set(r.toString(), rules[r](ruleBuilder as any).run(data[r]))
-        }
-        return validatorFromResult(rules, newResults)
-    },
-    fields:() => new Map(results.entries())
-})
+    }
+}
