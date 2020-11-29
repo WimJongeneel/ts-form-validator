@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { ValidatorState, validatorState, __ValidatorState } from "./validator";
+import { validator, ValidatorState, validatorState } from "./validator";
 import i18next = require("i18next");
 
 i18next.default.init({
@@ -45,13 +45,14 @@ class Form extends React.Component<{}, FormState> {
   }
 
   render() {
-    console.log(this.state.validator)
+    console.log(this.state.validator.fields.lastname?.jobs)
 
     return (
       <form noValidate onSubmit={e => {
         e.preventDefault()
         this.setState(s => ({...s, validator: s.validator.validate(s.data)}))
       }}>
+        {validator(this.state.validator).run(a => this.setState(s1 => ({...s1, validator: a(s1.validator)})))}
         <div>
           <label htmlFor="firstname">Firstname (validate on submit)</label><br />
           <input 
@@ -71,6 +72,7 @@ class Form extends React.Component<{}, FormState> {
         <div>
           <label htmlFor="lastname">Lastname (validate on type)</label><br />
           <input 
+            autoComplete="none"
             id="lastname"
             value={this.state.data.lastname}
             onChange={e => {
@@ -78,7 +80,7 @@ class Form extends React.Component<{}, FormState> {
               this.setState(s => ({
                 ...s, 
                 data: {...s.data, lastname},
-                // validator: s.validator.validate(s.data, 'lastname')
+                validator: s.validator.validate({...s.data, lastname}, 'lastname', 350)
               }))
             }}
           />

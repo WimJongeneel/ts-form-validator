@@ -1,6 +1,6 @@
 import i18next = require("i18next");
 import React = require("react");
-import { Widget, Action, fromJSX, nothing } from "widgets-for-react"
+import { Widget, Action, fromJSX, nothing, any, promise, onlyIf } from "widgets-for-react"
 import { Map } from 'immutable'
 
 interface Rule<a> {
@@ -155,7 +155,7 @@ export type FieldState<a> = BaseFieldState<a> & (
 
 export interface ValidatorState<a> {
     /**
-     * Contains the state of all the field of a
+     * Contains the state of all the fields of a
      */
     fields: Partial<{ [k in keyof a]: FieldState<a> }>
 
@@ -168,32 +168,51 @@ export interface ValidatorState<a> {
     
     /**
      * Validate all fields
-     * @param data  the data to validate
-     * @param delay the delay for showing the error
+     * @param data      the data to validate
+     * @param field     optional, when specified only this field will be validated
+     * @param delay     optional, when specified the validating will be delayed
      */
-    validate(data: a, delay?: number): ValidatorState<a>
+    validate(data: a, field?: keyof a, delay?: number): ValidatorState<a>
 
+    /**
+     * Get the status of this validator based of the status of the fields
+     */
     kind(): 'unvalidated' | 'validating' | 'partially validated' | 'validated'
 
-    error(field: keyof a): boolean
+    /**
+     * Get of there is any validation error in this validator
+     * @param field  optional, when specified only the state of this field will be considered
+     */
+    error(field?: keyof a): boolean
+
+    /**
+     * Clears the errors of this validator
+     * @param field     optional, when specified only this field will be cleared
+     */
+    clear(field?: keyof a): ValidatorState<a>
 }
 
-const unvalidated = <a>(rule: Rule<a>): FieldState<a> => ({
+const unvalidated = <a>(rule: Rule<a>, jobs: FieldState<a>['jobs']): FieldState<a> => ({
     kind: 'unvalidated',
     rule,
-    // todo: keep old jobs
-    jobs: {},
+    jobs: jobs,
     clear() {
-        // clear jobs
-        // todo: seperate clear updater?
-        return unvalidated(this.rule)
+        return unvalidated(this.rule, {...this.jobs, next: () => passed})
     },
     passed() {
         return this.kind == 'validated' && this.result.kind == 'passed'
     },
-    validate(data: a) {
-        // todo: add logic for async validating
-        return validated(this, data)
+    validate(data: a, delay = 0) {
+        if(delay == 0) return validated(this, data)
+
+        return {
+            ...this,
+            kind: 'validating',
+            jobs: {
+                ...this.jobs,
+                next: () => new Promise(res => setTimeout(() => res(this.rule.run(data)), delay))
+            }
+        }
     }
 })
 
@@ -208,7 +227,7 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
     const fields: Partial<{ [k in keyof a]: FieldState<a> }> = {}
 
     for(const k in rules) {
-        fields[k] = unvalidated(rules[k](ruleBuilder as any) as any)
+        fields[k] = unvalidated(rules[k](ruleBuilder as any) as any, {})
     }
 
     return {
@@ -216,7 +235,11 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
         kind() {
             const s: ValidatorState<a> = this
 
-            // todo: add logic for validating and partially (if needed?)
+            for(const k in s.fields) {
+                console.log(s.fields[k])
+                if(s.fields[k].kind == 'validating') return 'validating'
+            }
+
             for(const k in s.fields) {
                 console.log(s.fields[k])
                 if(s.fields[k].kind != 'validated') return 'unvalidated'
@@ -233,11 +256,16 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             // @ts-ignore
             return i18next.default.t(data.result.name, {...data.result.data, field: k, kind: data.result.name})
         },
-        validate(data: a) {
-            const newS: ValidatorState<a> = {...this}
+        validate(data: a, field, delay) {
+            const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
+
+            if(field != null) {
+                newS.fields[field] = newS.fields[field].validate(data[field] as any, delay)
+                return newS
+            }
 
             for(const k in newS.fields) {
-                newS.fields[k] = newS.fields[k].validate(data[k] as any)
+                newS.fields[k] = newS.fields[k].validate(data[k] as any, delay)
             }
 
             return newS
@@ -246,9 +274,67 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             const s: ValidatorState<a> = this
             const field = s.fields[k]
 
+            if(k != null) {
+                for(const k in s.fields) {
+                    if(s.fields[k].passed() == false) return true
+                }
+                return false
+            }
+
             if(field == null) return false
             if(field.kind != 'validated') return false
             return !field.passed()
+        },
+        clear(k) {
+            const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
+
+            if(k) {
+                newS.fields[k] = newS.fields[k].clear()
+                return newS
+            }
+
+            for(const k in newS.fields) {
+                newS.fields[k] = newS.fields[k].clear()
+            }
+
+            return newS
         }
     }
 }
+
+export const validator = <a>(s0:ValidatorState<a>): Widget<Action<ValidatorState<a>>> => any<Action<ValidatorState<a>>>()(
+    Object.keys(s0.fields).map(k => {
+        const key = k as keyof a
+
+        return field(s0.fields[key]).map(a => s1 => ({...s1, fields: {...s1.fields, [k]: a(s1.fields[key])}}))
+    })
+)
+
+const field = <a>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => any<Action<FieldState<a>>>()([
+    jobManager(s0),
+    onlyIf(
+        s0.jobs.current != null,
+        promise<FieldState<a>, Result>(
+            s1 => s1.jobs.current, 
+            // todo: generic error msg here
+            {on_fail: () => console.log('fail') as null}
+        )(s0).map(r => s1 => s1.jobs.next == null
+            ? ({ ...s1, kind: 'validated', result: r, jobs: { ...s1.jobs, current: null }})
+            : ({ ...s1, kind: 'unvalidated', jobs: { ...s1.jobs, current: null }})
+        )
+    )
+])
+
+const jobManager = <a>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => fromJSX(c => {
+    if(s0.jobs.next != null && s0.jobs.current == null) {
+        c(s1 => ({
+            ...s1,
+            jobs: {
+                current: s1.jobs.next(),
+                next: null
+            }
+        }))
+    }
+    return nothing().run(() => null)
+})
+
