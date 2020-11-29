@@ -112,10 +112,12 @@ type Rules<a> = Partial<{ [k in keyof a]: (b: Builder<a[k]>) => Rule<a[k]> }>
 interface BaseFieldState<a> {
     /**
      * Run the validation rule for this field
-     * @param data      the data for the field
-     * @param delay     delay the validation
+     * @param data                      the data for the field
+     * @param delay                     delay the validation
+     * @param clearWhenValidating       optional, when true the field will be cleared when the validator is running
+     * 
      */
-    validate(data: a, delay?: number): FieldState<a>
+    validate(data: a, delay?: number, clearWhenValidating?: boolean): FieldState<a>
     
     /**
      * Has this field passed the validation rule?
@@ -168,11 +170,12 @@ export interface ValidatorState<a> {
     
     /**
      * Validate all fields
-     * @param data      the data to validate
-     * @param field     optional, when specified only this field will be validated
-     * @param delay     optional, when specified the validating will be delayed
+     * @param data                      the data to validate
+     * @param field                     optional, when specified only this field will be validated
+     * @param delay                     optional, when specified the validating will be delayed
+     * @param clearWhenValidating       optional, when true the field will be cleared when the validator is running
      */
-    validate(data: a, field?: keyof a, delay?: number): ValidatorState<a>
+    validate(data: a, field?: keyof a, delay?: number, clearWhenValidating?: boolean): ValidatorState<a>
 
     /**
      * Get the status of this validator based of the status of the fields
@@ -202,12 +205,14 @@ const unvalidated = <a>(rule: Rule<a>, jobs: FieldState<a>['jobs']): FieldState<
     passed() {
         return this.kind == 'validated' && this.result.kind == 'passed'
     },
-    validate(data: a, delay = 0) {
+    validate(data: a, delay = 0, clearWhenValidating = false) {
         if(delay == 0) return validated(this, data)
 
         return {
             ...this,
-            kind: 'validating',
+            kind: clearWhenValidating 
+                ? this.kind == 'unvalidated' ? 'validating' : this.kind
+                : 'validating',
             jobs: {
                 ...this.jobs,
                 next: () => new Promise(res => setTimeout(() => res(this.rule.run(data)), delay))
@@ -256,16 +261,16 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             // @ts-ignore
             return i18next.default.t(data.result.name, {...data.result.data, field: k, kind: data.result.name})
         },
-        validate(data: a, field, delay) {
+        validate(data: a, field, delay, clearWhenValidating) {
             const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
 
             if(field != null) {
-                newS.fields[field] = newS.fields[field].validate(data[field] as any, delay)
+                newS.fields[field] = newS.fields[field].validate(data[field] as any, delay, clearWhenValidating)
                 return newS
             }
 
             for(const k in newS.fields) {
-                newS.fields[k] = newS.fields[k].validate(data[k] as any, delay)
+                newS.fields[k] = newS.fields[k].validate(data[k] as any, delay, clearWhenValidating)
             }
 
             return newS
@@ -320,7 +325,7 @@ const field = <a>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => any<Actio
             {on_fail: () => console.log('fail') as null}
         )(s0).map(r => s1 => s1.jobs.next == null
             ? ({ ...s1, kind: 'validated', result: r, jobs: { ...s1.jobs, current: null }})
-            : ({ ...s1, kind: 'unvalidated', jobs: { ...s1.jobs, current: null }})
+            : ({ ...s1, jobs: { ...s1.jobs, current: null }})
         )
     )
 ])
