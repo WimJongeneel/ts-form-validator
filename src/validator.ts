@@ -3,60 +3,74 @@ import React = require("react");
 import { Widget, Action, fromJSX, nothing, any, promise, onlyIf } from "widgets-for-react"
 import { Map } from 'immutable'
 
-interface Rule<a> {
-    and: (r: Rule<a>) => Rule<a>
-    or: (r: Rule<a>) => Rule<a>
+interface SyncRule<a> {
+    kind: 'rule'
+    and(r: SyncRule<a>): SyncRule<a>
+    or(r: SyncRule<a>): SyncRule<a>
     run: (v: a) => Result
+    /**
+     * Turn this Rule into an AsyncRule for composition with async rules
+     */
+    async: () => AsyncRule<a>
 }
 
+interface AsyncRule<a> {
+    kind: 'async-rule'
+    and: (r: AsyncRule<a>) => AsyncRule<a>
+    or: (r: AsyncRule<a>) => AsyncRule<a>
+    run: (v: a) => Promise<Result>
+}
+
+type Rule<a> = SyncRule<a> | AsyncRule<a>
+
 interface StringRuleBuilder {
-    required: Rule<string>
-    is(s: string): Rule<string>
-    min: (n: number) => Rule<string>
-    max: (n: number) => Rule<string>
-    contains: (s: string, c?: boolean) => Rule<string>
-    containsNot: (s: string, c?: boolean) => Rule<string>
-    hasNumber: Rule<string>
-    hasLetter: Rule<string>
-    hasCapital: Rule<string>
-    startsWith: (s: string) => Rule<string>
-    startsNotWith: (s: string) => Rule<string>
-    endsWith: (s: string) => Rule<string>
-    endsNotWith: (s: string) => Rule<string>
-    length: (n: number) => Rule<string>
-    email: Rule<string>
-    url: Rule<string>
-    alpha: Rule<string>
-    numeric: Rule<string>
-    alphaNumeric: Rule<string>
-    regex: (r: RegExp) => Rule<string>
+    required: SyncRule<string>
+    is(s: string): SyncRule<string>
+    min: (n: number) => SyncRule<string>
+    max: (n: number) => SyncRule<string>
+    contains: (s: string, c?: boolean) => SyncRule<string>
+    containsNot: (s: string, c?: boolean) => SyncRule<string>
+    hasNumber: SyncRule<string>
+    hasLetter: SyncRule<string>
+    hasCapital: SyncRule<string>
+    startsWith: (s: string) => SyncRule<string>
+    startsNotWith: (s: string) => SyncRule<string>
+    endsWith: (s: string) => SyncRule<string>
+    endsNotWith: (s: string) => SyncRule<string>
+    length: (n: number) => SyncRule<string>
+    email: SyncRule<string>
+    url: SyncRule<string>
+    alpha: SyncRule<string>
+    numeric: SyncRule<string>
+    alphaNumeric: SyncRule<string>
+    regex: (r: RegExp) => SyncRule<string>
 }
 
 interface DateRuleBuilder {
-    is(s: Date): Rule<Date>
-    afterOr: (d: Date) => Rule<Date>
-    oneOf(s: Date, ...as: Date[]): Rule<Date>
-    after: (d: Date) => Rule<Date>
-    before: (d: Date) => Rule<Date>
-    beforeOr: (d: Date) => Rule<Date>
-    betweenIncuding: (d1: Date, d2: Date) => Rule<Date>
-    between: (d1: Date, d2: Date) => Rule<Date>
+    is(s: Date): SyncRule<Date>
+    afterOr: (d: Date) => SyncRule<Date>
+    oneOf(s: Date, ...as: Date[]): SyncRule<Date>
+    after: (d: Date) => SyncRule<Date>
+    before: (d: Date) => SyncRule<Date>
+    beforeOr: (d: Date) => SyncRule<Date>
+    betweenIncuding: (d1: Date, d2: Date) => SyncRule<Date>
+    between: (d1: Date, d2: Date) => SyncRule<Date>
 }
 
 interface BoolRuleBuilder {
-    is:(s: boolean) => Rule<boolean>
-    oneOf(s: boolean, ...as: boolean[]): Rule<boolean>
-    true: Rule<boolean>
-    false: Rule<boolean>
+    is:(s: boolean) => SyncRule<boolean>
+    oneOf(s: boolean, ...as: boolean[]): SyncRule<boolean>
+    true: SyncRule<boolean>
+    false: SyncRule<boolean>
 }
 
 interface NumberRuleBuilder {
-    is(s: number): Rule<number>
-    oneOf(s: number, ...as: number[]): Rule<number>
-    bigger: (n:number) => Rule<number>
-    biggerOr: (n:number) => Rule<number>
-    lesser: (n:number) => Rule<number>
-    lesserOr: (n:number) => Rule<number>
+    is(s: number): SyncRule<number>
+    oneOf(s: number, ...as: number[]): SyncRule<number>
+    bigger: (n:number) => SyncRule<number>
+    biggerOr: (n:number) => SyncRule<number>
+    lesser: (n:number) => SyncRule<number>
+    lesserOr: (n:number) => SyncRule<number>
 }
 
 type Builder<a> = 
@@ -69,13 +83,14 @@ type Result =
     | { kind: 'passed' }
     | { kind: 'failed', name:string, data: object}
 
-const passed: Result = {kind: 'passed'}
+export const passed: Result = {kind: 'passed'}
 
-const failed = (name: string, data: object = {}): Result => ({
+export const failed = (name: string, data: object = {}): Result => ({
     kind: 'failed', name, data: {...data, name}
 })
 
-const rule = <a>(p: (a:a) => Result): Rule<a> => ({
+export const rule = <a>(p: (a:a) => Result): SyncRule<a> => ({
+    kind: 'rule',
     run: p,
     and(r) {
         return rule(a => {
@@ -87,6 +102,31 @@ const rule = <a>(p: (a:a) => Result): Rule<a> => ({
     or(r) {
         return rule(a => {
             const r1 = this.run(a)
+            if(r1.kind == 'passed') return r1
+            return r.run(a)
+        })
+    },
+    async() {
+        return asyncRule(a => Promise.resolve(this.run(a)))
+    }
+})
+
+export const asyncRule = <a>(p: (a:a) => Promise<Result>): AsyncRule<a> => ({
+    kind: 'async-rule',
+    run: p,
+    and(r) {
+        const s: AsyncRule<a> = this
+        return asyncRule(async(a) => {
+            const r1 = await s.run(a)
+            if(r1.kind == 'failed') return r1
+            return r.run(a)
+        })
+    },
+    or(r) {
+        const s: AsyncRule<a> = this
+
+        return asyncRule(async (a) => {
+            const r1 = await s.run(a)
             if(r1.kind == 'passed') return r1
             return r.run(a)
         })
@@ -195,7 +235,7 @@ export interface ValidatorState<a> {
     clear(field?: keyof a): ValidatorState<a>
 }
 
-const unvalidated = <a>(rule: Rule<a>, jobs: FieldState<a>['jobs']): FieldState<a> => ({
+const unvalidated = <a>(rule: SyncRule<a>, jobs: FieldState<a>['jobs']): FieldState<a> => ({
     kind: 'unvalidated',
     rule,
     jobs: jobs,
@@ -206,7 +246,25 @@ const unvalidated = <a>(rule: Rule<a>, jobs: FieldState<a>['jobs']): FieldState<
         return this.kind == 'validated' && this.result.kind == 'passed'
     },
     validate(data: a, delay = 0, clearWhenValidating = false) {
-        if(delay == 0) return validated(this, data)
+        const self: FieldState<a> = this
+        
+        if(delay == 0 && self.rule.kind == 'rule') return {
+            ...self,
+            kind: 'validated',
+            result: self.rule.run(data),
+        }
+
+
+        if(delay == 0) return {
+            ...self,
+            kind: clearWhenValidating 
+                ? self.kind == 'unvalidated' ? 'validating' : this.kind
+                : 'validating',
+            jobs: {
+                ...self.jobs,
+                next: () => self.rule.run(data)
+            }
+        }
 
         return {
             ...this,
@@ -215,16 +273,10 @@ const unvalidated = <a>(rule: Rule<a>, jobs: FieldState<a>['jobs']): FieldState<
                 : 'validating',
             jobs: {
                 ...this.jobs,
-                next: () => new Promise(res => setTimeout(() => res(this.rule.run(data)), delay))
+                next: () => new Promise(res => setTimeout(() => res(this.rule.run(data)), delay)).then(() => self.rule.run(data))
             }
         }
     }
-})
-
-const validated = <a>(a: FieldState<a>, data: a): FieldState<a> => ({
-    ...a,
-    kind: 'validated',
-    result: a.rule.run(data),
 })
 
 export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {

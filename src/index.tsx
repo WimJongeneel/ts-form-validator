@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { validator, ValidatorState, validatorState } from "./validator";
+import { asyncRule, passed, validator, ValidatorState, validatorState } from "./validator";
 import i18next = require("i18next");
 
 i18next.default.init({
@@ -25,9 +25,11 @@ interface FormData {
   accept: boolean
 }
 
+const delay = asyncRule(() => new Promise(r => setTimeout(() => r(passed), Math.random() * 1000 + 150)))
+
 const initValidatorState = validatorState<FormData>({
   accept: b => b.is(true),
-  firstname: b => b.alphaNumeric.and(b.min(2)).and(b.max(255)),
+  firstname: b => delay.and(b.alphaNumeric.and(b.min(2)).and(b.max(255)).async()),
   lastname: b => b.alphaNumeric.and(b.min(2)).and(b.max(255)),
   email: b => b.email
 })
@@ -56,6 +58,7 @@ class Form extends React.Component<{}, FormState> {
         <div>
           <label htmlFor="firstname">Firstname (validate on submit)</label><br />
           <input 
+            autoComplete="none"
             id="firstname"
             value={this.state.data.firstname}
             onChange={e => {
@@ -63,6 +66,7 @@ class Form extends React.Component<{}, FormState> {
               this.setState(s => ({
                 ...s, 
                 data: {...s.data, firstname: name},
+                validator: s.validator.validate({...s.data, firstname: name}, 'firstname')
               }))
             }}
           />
