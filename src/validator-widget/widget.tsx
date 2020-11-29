@@ -2,6 +2,10 @@ import React = require("react")
 import { Action, any, fromJSX, onlyIf, promise, Widget } from "widgets-for-react"
 import { FieldState, ValidatorState, Result } from "."
 
+/**
+ * The IOWidget that contains the statemachine for the validator
+ * @param s0    the current ValidatorState<?>
+ */
 export const validator = <a,>(s0:ValidatorState<a>): Widget<Action<ValidatorState<a>>> => any<Action<ValidatorState<a>>>()(
     Object.keys(s0.fields).map(k => {
         const key = k as keyof a
@@ -10,6 +14,10 @@ export const validator = <a,>(s0:ValidatorState<a>): Widget<Action<ValidatorStat
     })
 )
 
+/**
+ * The IOWidget that contains the statemachine for a single field 
+ * @param s0    the current FieldState<?>
+ */
 const field = <a,>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => any<Action<FieldState<a>>>()([
     jobManager(s0),
     onlyIf(
@@ -25,6 +33,10 @@ const field = <a,>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => any<Acti
     )
 ])
 
+/**
+ * The IOWidget that manages the async jobs for a a single field
+ * @param s0    the current FieldState<?>
+ */
 const jobManager = <a,>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => fromJSX(c => {
     if(s0.jobs.next != null && s0.jobs.current == null) {
         c(s1 => ({

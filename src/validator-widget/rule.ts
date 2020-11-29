@@ -55,16 +55,31 @@ export interface AsyncRule<a> {
 
 export type Rule<a> = SyncRule<a> | AsyncRule<a>
 
+/**
+ * The result of a validation
+ */
 export type Result = 
     | { kind: 'passed' }
     | { kind: 'failed', name:string, data: object}
 
+/**
+ * Constant value for the result of passed rules
+ */
 export const passed: Result = {kind: 'passed'}
 
+/**
+ * Constructs a failed result for a rule
+ * @param name      name of the failed rule 
+ * @param data      data object for the rendering
+ */
 export const failed = (name: string, data: object = {}): Result => ({
     kind: 'failed', name, data: {...data, name}
 })
 
+/**
+ * Constructs a sync rule from a predicate
+ * @param p     the predicate that returns its result as a Result type
+ */
 export const rule = <a>(p: (a:a) => Result): SyncRule<a> => ({
     kind: 'sync-rule',
     run: p,
@@ -87,6 +102,10 @@ export const rule = <a>(p: (a:a) => Result): SyncRule<a> => ({
     }
 })
 
+/**
+ * Constructs an async rule from an async predicate
+ * @param p     the predicate that returns its result as a Promise of the Result type
+ */
 export const asyncRule = <a>(p: (a:a) => Promise<Result>): AsyncRule<a> => ({
     kind: 'async-rule',
     run: p,
