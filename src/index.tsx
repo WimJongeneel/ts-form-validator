@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { asyncRule, passed, validator, ValidatorState, validatorState } from "./validator";
+import { asyncRule, passed, validator, ValidatorState, validatorState } from "./validator-widget";
 import i18next = require("i18next");
 
 i18next.default.init({
