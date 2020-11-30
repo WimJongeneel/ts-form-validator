@@ -49,6 +49,12 @@ export type FieldState<a> = BaseFieldState<a> & (
     | { kind: 'validating', job: () => Promise<Result> }
     | { kind: 'validated', result: Result })
 
+export interface TranslationOptions {
+    ns?: string
+    key?: string
+    data?: object
+}
+
 export interface ValidatorState<a> {
     /**
      * Contains the state of all the fields of a
@@ -58,9 +64,10 @@ export interface ValidatorState<a> {
     /**
      * Get the translated error message for a field
      * Returns null if there is no error for the specified field
-     * @param field the name of the field
+     * @param field     the name of the field
+     * @param o         additional options for i18next
      */
-    message(field: keyof a): string | null
+    message(field: keyof a, o?: TranslationOptions): string | null
     
     /**
      * Validate all fields
@@ -142,31 +149,36 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
     }
 
     return {
+
         fields,
+
         kind() {
             const s: ValidatorState<a> = this
 
             for(const k in s.fields) {
-                console.log(s.fields[k])
                 if(s.fields[k].kind == 'validating') return 'validating'
             }
 
             for(const k in s.fields) {
-                console.log(s.fields[k])
                 if(s.fields[k].kind != 'validated') return 'unvalidated'
             }
 
             return 'validated'
         },
-        message(k) {
+
+        message(k, o = {}) {
             const s: ValidatorState<a> = this
             const data: FieldState<a[typeof k]> = s.fields[k] as any
             if(data.kind != 'validated') return null
             if(data.result.kind == 'passed') return null
-            // todo: type translation data object
-            // @ts-ignore
-            return i18next.default.t(data.result.name, {...data.result.data, field: k, kind: data.result.name})
+
+            const renderData = {...data.result.data, field: k, kind: data.result.name, ...(o.data || {})}
+
+            if(o.key) return i18next.default.t(`${o.ns ? o.ns + ':' : ''}${o.key}`, renderData)
+            if(i18next.default.exists(`${o.ns ? o.ns + ':' : ''}${data.result.name}__${k}`)) return i18next.default.t(`${data.result.name}__${k}`, renderData)
+            return i18next.default.t(`${o.ns ? o.ns + ':' : ''}${data.result.name}`, renderData)
         },
+
         validate(data: a, field, delay, clearWhenValidating) {
             const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
 
@@ -181,6 +193,7 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
 
             return newS
         },
+
         error(k) {
             const s: ValidatorState<a> = this
             const field = s.fields[k]
@@ -196,6 +209,7 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             if(field.kind != 'validated') return false
             return !field.passed()
         },
+
         clear(k) {
             const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
 
