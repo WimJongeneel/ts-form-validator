@@ -30,7 +30,7 @@ const delay = asyncRule(() => new Promise(r => setTimeout(() => r(passed), Math.
 const initValidatorState = validatorState<FormData>({
   accept: b => b.is(true),
   firstname: b => delay.and(b.alphaNumeric.and(b.min(2)).and(b.max(255)).async()),
-  lastname: b => b.alphaNumeric.and(b.min(2)).and(b.max(255)),
+  lastname: b => b.alphaNumeric.and(b.min(2).and(b.max(25))),
   email: b => b.email
 })
 
