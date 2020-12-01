@@ -18,11 +18,11 @@ export const validator = <a,>(s0:ValidatorState<a>): Widget<Action<ValidatorStat
  * The IOWidget that contains the statemachine for a single field 
  * @param s0    the current FieldState<?>
  */
-const field = <a,>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => any<Action<FieldState<a>>>()([
+const field = <root, prop>(s0: FieldState<root, prop>): Widget<Action<FieldState<root, prop>>> => any<Action<FieldState<root, prop>>>()([
     jobManager(s0),
     onlyIf(
         s0.jobs.current != null,
-        promise<FieldState<a>, Result>(
+        promise<FieldState<root, prop>, Result>(
             s1 => s1.jobs.current, 
             // todo: generic error msg here
             {on_fail: () => console.log('fail') as null}
@@ -37,7 +37,7 @@ const field = <a,>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => any<Acti
  * The IOWidget that manages the async jobs for a a single field
  * @param s0    the current FieldState<?>
  */
-const jobManager = <a,>(s0: FieldState<a>): Widget<Action<FieldState<a>>> => fromJSX(c => {
+const jobManager = <root, prop>(s0: FieldState<root, prop>): Widget<Action<FieldState<root, prop>>> => fromJSX(c => {
     if(s0.jobs.next != null && s0.jobs.current == null) {
         c(s1 => ({
             ...s1,

@@ -12,7 +12,8 @@ i18next.default.init({
         "alphaNumeric": "{{field}} must be alpa-numeric, '{{given}}' given",
         "min": "{{field}} must be at least {{expected}} characters long, {{length}} given",
         "max": "{{field}} must be max {{expected}} characters long, {{length}} given",
-        "email": "{{field}} is not an email"
+        "email": "{{field}} is not an email",
+        "equalTo": "given: {{given}}, key: {{key}}, other: {{other}}",
       }
     }
   }
@@ -23,6 +24,8 @@ interface FormData {
   lastname: string
   email: string
   accept: boolean
+  password: string
+  passwordRepeat: string
 }
 
 const delay = asyncRule(() => new Promise(r => setTimeout(() => r(passed), Math.random() * 1000 + 150)))
@@ -31,7 +34,9 @@ const initValidatorState = validatorState<FormData>({
   accept: b => b.is(true),
   firstname: b => delay.and(b.alphaNumeric.and(b.min(2)).and(b.max(255)).async()),
   lastname: b => b.alphaNumeric.and(b.min(2).and(b.max(25))),
-  email: b => b.email
+  email: b => b.custom((v, r) => console.log(v, r) == null && passed).and(b.email),
+  password: b => b.hasCapital.and(b.hasNumber).and(b.hasLetter),
+  passwordRepeat: b => b.required.and(b.equalTo('password'))
 })
 
 interface FormState {
@@ -43,12 +48,10 @@ class Form extends React.Component<{}, FormState> {
 
   state: FormState = {
     validator: initValidatorState,
-    data: { accept: false, email: '', firstname: '', lastname: '' }
+    data: { accept: false, email: '', firstname: '', lastname: '', password: '', passwordRepeat: '' }
   }
 
   render() {
-    console.log(this.state.validator.fields.lastname?.jobs)
-
     return (
       <form noValidate onSubmit={e => {
         e.preventDefault()
@@ -108,6 +111,42 @@ class Form extends React.Component<{}, FormState> {
             }}
           />
           {this.state.validator.error('email') && <div>{this.state.validator.message('email')}</div>}
+        </div>
+
+        <div>
+          <label htmlFor="password">password (validate on submit)</label><br />
+          <input 
+            autoComplete="none"
+            id="password"
+            value={this.state.data.password}
+            onChange={e => {
+              const password = e.currentTarget.value
+              this.setState(s => ({
+                ...s, 
+                data: {...s.data, password},
+                validator: s.validator.validate({...s.data, password}, 'password')
+              }))
+            }}
+          />
+          {this.state.validator.error('password') && <div>{this.state.validator.message('password')}</div>}
+        </div>
+
+        <div>
+          <label htmlFor="passwordRepeat">passwordRepeat (validate on submit)</label><br />
+          <input 
+            autoComplete="none"
+            id="passwordRepeat"
+            value={this.state.data.passwordRepeat}
+            onChange={e => {
+              const passwordRepeat = e.currentTarget.value
+              this.setState(s => ({
+                ...s, 
+                data: {...s.data, passwordRepeat},
+                validator: s.validator.validate({...s.data, passwordRepeat}, 'passwordRepeat')
+              }))
+            }}
+          />
+          {this.state.validator.error('passwordRepeat') && <div>{this.state.validator.message('passwordRepeat')}</div>}
         </div>
 
         <div>

@@ -1,4 +1,4 @@
-export interface SyncRule<a> {
+export interface SyncRule<root, prop> {
     /**
      * The kind of this rule
      */
@@ -8,27 +8,27 @@ export interface SyncRule<a> {
      * Compose this rule via an AND operator. Short circuiting will be used. 
      * @param r     the rule to compose with
      */
-    and(r: SyncRule<a>): SyncRule<a>
+    and(r: SyncRule<root, prop>): SyncRule<root, prop>
     
     /**
      * Compose this rule via an OR operator. Short circuiting will be used. 
      * @param r     the rule to compose with
      */
-    or(r: SyncRule<a>): SyncRule<a>
+    or(r: SyncRule<root, prop>): SyncRule<root, prop>
     
     /**
      * Run this validator
      * @param v     the value to validate
      */
-    run: (v: a) => Result
+    run: (v: prop, r: root) => Result
 
     /**
      * Turn this Rule into an AsyncRule for composition with async rules
      */
-    async: () => AsyncRule<a>
+    async: () => AsyncRule<root, prop>
 }
 
-export interface AsyncRule<a> {
+export interface AsyncRule<root, prop> {
     /**
      * The kind of this rule
      */
@@ -38,22 +38,22 @@ export interface AsyncRule<a> {
      * Compose this rule via an AND operator. Short circuiting will be used. 
      * @param r     the rule to compose with
      */
-    and: (r: AsyncRule<a>) => AsyncRule<a>
+    and: (r: AsyncRule<root, prop>) => AsyncRule<root, prop>
 
     /**
      * Compose this rule via an OR operator. Short circuiting will be used. 
      * @param r     the rule to compose with
      */
-    or: (r: AsyncRule<a>) => AsyncRule<a>
+    or: (r: AsyncRule<root, prop>) => AsyncRule<root, prop>
 
     /**
      * Run this validator
      * @param v     the value to validate
      */
-    run: (v: a) => Promise<Result>
+    run: (v: prop, r: root) => Promise<Result>
 }
 
-export type Rule<a> = SyncRule<a> | AsyncRule<a>
+export type Rule<root, prop> = SyncRule<root, prop>| AsyncRule<root, prop>
 
 /**
  * The result of a validation
@@ -80,21 +80,21 @@ export const failed = (name: string, data: object = {}): Result => ({
  * Constructs a sync rule from a predicate
  * @param p     the predicate that returns its result as a Result type
  */
-export const rule = <a>(p: (a:a) => Result): SyncRule<a> => ({
+export const rule = <root, prop>(p: (a:prop, r: root) => Result): SyncRule<root, prop> => ({
     kind: 'sync-rule',
     run: p,
     and(r) {
-        return rule(a => {
-            const r1 = this.run(a)
+        return rule((a, root) => {
+            const r1 = this.run(a, root)
             if(r1.kind == 'failed') return r1
-            return r.run(a)
+            return r.run(a, root)
         })
     },
     or(r) {
-        return rule(a => {
-            const r1 = this.run(a)
+        return rule((a, root) => {
+            const r1 = this.run(a, root)
             if(r1.kind == 'passed') return r1
-            return r.run(a)
+            return r.run(a, root)
         })
     },
     async() {
@@ -106,24 +106,24 @@ export const rule = <a>(p: (a:a) => Result): SyncRule<a> => ({
  * Constructs an async rule from an async predicate
  * @param p     the predicate that returns its result as a Promise of the Result type
  */
-export const asyncRule = <a>(p: (a:a) => Promise<Result>): AsyncRule<a> => ({
+export const asyncRule = <root, prop>(p: (a:prop, r: root) => Promise<Result>): AsyncRule<root, prop> => ({
     kind: 'async-rule',
     run: p,
     and(r) {
-        const s: AsyncRule<a> = this
-        return asyncRule(async(a) => {
-            const r1 = await s.run(a)
+        const s: AsyncRule<root, prop> = this
+        return asyncRule(async(a, root) => {
+            const r1 = await s.run(a, root)
             if(r1.kind == 'failed') return r1
-            return r.run(a)
+            return r.run(a, root)
         })
     },
     or(r) {
-        const s: AsyncRule<a> = this
+        const s: AsyncRule<root, prop> = this
 
-        return asyncRule(async (a) => {
-            const r1 = await s.run(a)
+        return asyncRule(async (a, root) => {
+            const r1 = await s.run(a, root)
             if(r1.kind == 'passed') return r1
-            return r.run(a)
+            return r.run(a, root)
         })
     },
 })

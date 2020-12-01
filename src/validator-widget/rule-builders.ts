@@ -1,245 +1,258 @@
 import { failed, passed, rule, SyncRule } from ".";
+import { Result } from "./rule";
 
-export interface StringRuleBuilder {
+export interface StringRuleBuilder<root> {
+
+    /**
+     * Validates with a custom function
+     * @param f     the custom validator function
+     */
+    custom(f: (v:string, root: root) => Result): SyncRule<root, string>
+
+    /**
+     * Validates if this value is equal to another field in a
+     * @param k     key of the other field
+     */
+    equalTo(k: keyof root): SyncRule<root, string>
     
     /**
      * Validates if the field is non-empty
      */
-    required: SyncRule<string>
+    required: SyncRule<root, string>
    
     /**
      * Validates if the value is equal to the provided value
      * @param s     the string to test the value againts
      */
-    is(s: string): SyncRule<string>
+    is(s: string): SyncRule<root, string>
     
     /**
      * Validates if the value has a min length
      * @param n     the min length
      */
-    min(n: number): SyncRule<string>
+    min(n: number): SyncRule<root, string>
     
     /**
      * Validates if the value is below a max length
      * @param n     the max length
      */
-    max(n: number): SyncRule<string>
+    max(n: number): SyncRule<root, string>
     
     /**
      * Validates if the value contains a certain string
      * @param s     the string to test with
      * @param c     flag to indicate case sensitifity
      */
-    contains(s: string, c?: boolean): SyncRule<string>
+    contains(s: string, c?: boolean): SyncRule<root, string>
     
     /**
      * Validates if the value does not contain a certain string
      * @param s     the string to test with
      * @param c     flag to indicate case sensitifity
      */
-    containsNot(s: string, c?: boolean): SyncRule<string>
+    containsNot(s: string, c?: boolean): SyncRule<root, string>
     
     /**
      * Validates if the value contains a number
      */
-    hasNumber: SyncRule<string>
+    hasNumber: SyncRule<root, string>
     
     /**
      * Validates if the value contains an a lowercase letter
      */
-    hasLetter: SyncRule<string>
+    hasLetter: SyncRule<root, string>
     
     /**
      * Validates if the value contains a uppercase letter
      */
-    hasCapital: SyncRule<string>
+    hasCapital: SyncRule<root, string>
     
     /**
      * Validates if the value starts with a certain string
      * @param s     the string to test with
      */
-    startsWith(s: string): SyncRule<string>
+    startsWith(s: string): SyncRule<root, string>
     
     /**
      * Validates if the value start not with a certain string
      * @param s     the string to test with
      */
-    startsNotWith(s: string): SyncRule<string>
+    startsNotWith(s: string): SyncRule<root, string>
 
     /**
      * Validates if the value ends with a certain string
      * @param s     the string to test with
      */
-    endsWith(s: string): SyncRule<string>
+    endsWith(s: string): SyncRule<root, string>
 
     /**
      * Validates if the value ends not with a certain string
      * @param s     the string to test with
      */
-    endsNotWith(s: string): SyncRule<string>
+    endsNotWith(s: string): SyncRule<root, string>
 
     /**
      * Validates if the value has a certain length
      * @param n     the length of the value
      */
-    length(n: number): SyncRule<string>
+    length(n: number): SyncRule<root, string>
 
     /**
      * Validates if the value is an email
      */
-    email: SyncRule<string>
+    email: SyncRule<root, string>
 
     /**
      * Validates if the value is a valid url
      */
-    url: SyncRule<string>
+    url: SyncRule<root, string>
 
     /**
      * Validates if the value only consists of alpha chars
      */
-    alpha: SyncRule<string>
+    alpha: SyncRule<root, string>
 
     /**
      * Validates if the value only consists of numeric chars
      */
-    numeric: SyncRule<string>
+    numeric: SyncRule<root, string>
 
     /**
      * Validates if the value only consists of alpha and numeric chars
      */
-    alphaNumeric: SyncRule<string>
+    alphaNumeric: SyncRule<root, string>
 
     /**
      * Validates if the value matches a certain reges
      * @param r     the regex to test the value against
      */
-    regex(r: RegExp): SyncRule<string>
+    regex(r: RegExp): SyncRule<root, string>
 }
 
-export interface DateRuleBuilder {
+export interface DateRuleBuilder<root> {
     
     /**
      * Validates if the value is equal to a given date
      * @param d     the date to compare with
      */
-    is(d: Date): SyncRule<Date>
+    is(d: Date): SyncRule<root, Date>
 
     /**
      * Validates if the value is equal or after a given date
      * @param d     the date to compare with
      */
-    afterOr(d: Date): SyncRule<Date>
+    afterOr(d: Date): SyncRule<root, Date>
 
     /**
      * Validates if the value is equal to one of the given dates
      * @param d     the first date to compare with
      * @param as    the rest of the dates to compare with
      */
-    oneOf(d: Date, ...as: Date[]): SyncRule<Date>
+    oneOf(d: Date, ...as: Date[]): SyncRule<root, Date>
 
     /**
      * Validates if the value is after a given date
      * @param d     the date to compare with
      */
-    after(d: Date): SyncRule<Date>
+    after(d: Date): SyncRule<root, Date>
 
     /**
      * Validates if the value is before a given date
      * @param d     the date to compare with
      */
-    before(d: Date): SyncRule<Date>
+    before(d: Date): SyncRule<root, Date>
 
     /**
      * Validates if the value is equal to or before a given date
      * @param d     the date to compare with
      */
-    beforeOr(d: Date): SyncRule<Date>
+    beforeOr(d: Date): SyncRule<root, Date>
 
     /**
      * Validates if the value is between or equal to two given dates
      * @param d1    the first date
      * @param d2    the second date
      */
-    betweenIncuding(d1: Date, d2: Date): SyncRule<Date>
+    betweenIncuding(d1: Date, d2: Date): SyncRule<root, Date>
 
     /**
      * Validates if the value is between and not equal to two given dates
      * @param d1    the first date
      * @param d2    the second date
      */
-    between(d1: Date, d2: Date): SyncRule<Date>
+    between(d1: Date, d2: Date): SyncRule<root, Date>
 }
 
-export interface BoolRuleBuilder {
+export interface BoolRuleBuilder<root> {
     /**
      * Validates if the value is true
      */
-    true: SyncRule<boolean>
+    true: SyncRule<root, boolean>
 
     /**
      * validates is the value is false
      */
-    false: SyncRule<boolean>
+    false: SyncRule<root, boolean>
 
     /**
      * Validates if the value is equal to the given boolean
      * @param b     the boolean to compare with
      */
-    is(b: boolean): SyncRule<boolean>
+    is(b: boolean): SyncRule<root, boolean>
 }
 
-export interface NumberRuleBuilder {
+export interface NumberRuleBuilder<root> {
     /**
      * Validates if the value is equal to the given number
      * @param n     the number to compare with
      */
-    is(n: number): SyncRule<number>
+    is(n: number): SyncRule<root, number>
 
     /**
      * Validates if the value is equal to one of the given numbers
      * @param n     the first number to compare to     
      * @param ns    the other numbers to compare to 
      */
-    oneOf(n: number, ...ns: number[]): SyncRule<number>
+    oneOf(n: number, ...ns: number[]): SyncRule<root, number>
 
     /**
      * Validates if the value is bigger then a given number
      * @param n     the number to compare with
      */
-    bigger(n:number): SyncRule<number>
+    bigger(n:number): SyncRule<root, number>
 
     /**
      * Validates if the value is bigger or equal to a given number
      * @param n     the number to compare with
      */
-    biggerOr(n:number): SyncRule<number>
+    biggerOr(n:number): SyncRule<root, number>
 
     /**
      * Validates if the value is less then a given number
      * @param n     the number to compare with
      */
-    lesser(n:number): SyncRule<number>
+    lesser(n:number): SyncRule<root, number>
 
     /**
      * Validates if the value is less or equal to a given number
      * @param n     the number to compare with
      */
-    lesserOr(n:number): SyncRule<number>
+    lesserOr(n:number): SyncRule<root, number>
 }
 
 /**
  * Mapped type to get a specif builder for a generic a
  */
-export type Builder<a> = 
-    a extends string ? StringRuleBuilder :
-    a extends boolean ? BoolRuleBuilder :
-    a extends Date ? DateRuleBuilder :
+export type Builder<root, prop> = 
+    prop extends string ? StringRuleBuilder<root> :
+    prop extends boolean ? BoolRuleBuilder<root> :
+    prop extends Date ? DateRuleBuilder<root> :
     never
     
 /**
  * Runtime implementation of all the rule builder in one object
  */
-export const ruleBuilder: DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder & NumberRuleBuilder = {
+export const ruleBuilder: <root>() => DateRuleBuilder<root> & StringRuleBuilder<root> & BoolRuleBuilder<root> & NumberRuleBuilder<root> = () => ({
     
     is:(v:any) => rule(a => v == a ? passed : failed('is', {expected: v, given: a, kind: 'is'})),
 
@@ -253,7 +266,7 @@ export const ruleBuilder: DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder 
 
     oneOf:(...vs: any[]) => rule(a => vs.some(v => v == a) ? passed :failed('oneOf', {given: a, expected: vs.join(', ')})),
 
-    required: rule<string>(a => !!!a ? passed : failed('required')),
+    required: rule(a => (a || '').length > 0 ? passed : failed('required')),
 
     false: rule(b => b === false ? passed : failed('false')),
 
@@ -296,7 +309,7 @@ export const ruleBuilder: DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder 
 
     hasNumber: rule(a => /[0-9]/.test(a) ? passed : failed('hasNumber', {kind: 'hasNumber',given: a})),
 
-    hasLetter: rule(a => /[a-zA-Z]/.test(a) ? passed : failed('hasLetter', {kind: 'hasLetter',given: a})),
+    hasLetter: rule(a => /[a-z]/.test(a) ? passed : failed('hasLetter', {kind: 'hasLetter',given: a})),
 
     url: rule(v => ((v || '').startsWith('http://') || (v || '').startsWith('https://')) && (v || '').includes('.') ? passed : failed('hasLetter', {kind: 'hasLetter',given: v})),
 
@@ -307,4 +320,8 @@ export const ruleBuilder: DateRuleBuilder & StringRuleBuilder & BoolRuleBuilder 
     contains: null,
 
     containsNot: null,
-}
+
+    equalTo: (k) => rule((a, r) => (a as any) === r[k] ? passed : failed('equalTo', {kind: 'equalTo', given: a, key: k, other: r[k]})),
+
+    custom: (f) => rule(f)
+})
