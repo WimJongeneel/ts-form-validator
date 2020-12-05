@@ -1,5 +1,4 @@
-import { failed, passed, rule, SyncRule } from ".";
-import { Result } from "./rule";
+import { failed, passed, rule, SyncRule, Result } from ".";
 
 export interface StringRuleBuilder<root> {
 
@@ -9,6 +8,18 @@ export interface StringRuleBuilder<root> {
      */
     custom(f: (v:string, root: root) => Result): SyncRule<root, string>
 
+    /**
+     * Validates with the picked validator
+     * @param f     the function that picks the rule
+     */
+    pick(f: (v:string, root: root) => SyncRule<root, string>): SyncRule<root, string>
+
+    /**
+     * Validates with a custom function
+     * @param f     the custom validator function
+     */
+    all(r:SyncRule<root, string>, ...rs: SyncRule<root, string>[]): SyncRule<root, string>
+    
     /**
      * Validates if this value is equal to another field in a
      * @param k     key of the other field
@@ -127,6 +138,16 @@ export interface StringRuleBuilder<root> {
      * @param r     the regex to test the value against
      */
     regex(r: RegExp): SyncRule<root, string>
+
+    /**
+     * Validates if the value is empty
+     */
+    empty: SyncRule<root, string>
+
+    /**
+     * Validates if the value is a valid phone number
+     */
+    phone: SyncRule<root, string>
 }
 
 export interface DateRuleBuilder<root> {
@@ -254,7 +275,9 @@ export type Builder<root, prop> =
  */
 export const ruleBuilder: <root>() => DateRuleBuilder<root> & StringRuleBuilder<root> & BoolRuleBuilder<root> & NumberRuleBuilder<root> = () => ({
     
-    is:(v:any) => rule(a => v == a ? passed : failed('is', {expected: v, given: a, kind: 'is'})),
+    all:(...r) => r.reduce((v, c) => v.and(c)),
+
+    is:(v:any) => rule<any, any>(a => v == a ? passed : failed('is', {expected: v, given: a, kind: 'is'})),
 
     max:(n:number) => rule((a:string) => n >= a.length ? passed : failed('max', {expected: n, given: a, length: a.length})),
 
@@ -264,7 +287,7 @@ export const ruleBuilder: <root>() => DateRuleBuilder<root> & StringRuleBuilder<
 
     alphaNumeric: rule((a:string) => /^[a-zA-Z0-9]+$/i.test(a) ? passed : failed('alphaNumeric', {given: a})),
 
-    oneOf:(...vs: any[]) => rule(a => vs.some(v => v == a) ? passed :failed('oneOf', {given: a, expected: vs.join(', ')})),
+    oneOf:(...vs: any[]) => rule<any, any>(a => vs.some(v => v == a) ? passed :failed('oneOf', {given: a, expected: vs.join(', ')})),
 
     required: rule(a => (a || '').length > 0 ? passed : failed('required')),
 
@@ -311,17 +334,23 @@ export const ruleBuilder: <root>() => DateRuleBuilder<root> & StringRuleBuilder<
 
     hasLetter: rule(a => /[a-z]/.test(a) ? passed : failed('hasLetter', {kind: 'hasLetter',given: a})),
 
-    url: rule(v => ((v || '').startsWith('http://') || (v || '').startsWith('https://')) && (v || '').includes('.') ? passed : failed('hasLetter', {kind: 'hasLetter',given: v})),
+    url: rule(v => ((v || '').startsWith('http://') || (v || '').startsWith('https://')) && (v || '').includes('.') ? passed : failed('url', {kind: 'url',given: v})),
 
-    between: null,
+    between: null!,
 
-    betweenIncuding: null,
+    betweenIncuding: null!,
 
-    contains: null,
+    contains: null!,
 
-    containsNot: null,
+    containsNot: null!,
 
     equalTo: (k) => rule((a, r) => (a as any) === r[k] ? passed : failed('equalTo', {kind: 'equalTo', given: a, key: k, other: r[k]})),
 
-    custom: (f) => rule(f)
+    custom: (f) => rule(f),
+
+    empty: rule(a => (a || '').length == 0 ? passed : failed('empty')),
+
+    phone: rule(a => /^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$/g.test(a) ? passed : failed('phone')),
+
+    pick: f => rule((a, r) => f(a, r).run(a, r))
 })

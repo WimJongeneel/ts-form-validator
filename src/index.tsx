@@ -35,7 +35,7 @@ const initValidatorState = validatorState<FormData>({
   firstname: b => delay.and(b.alphaNumeric.and(b.min(2)).and(b.max(255)).async()),
   lastname: b => b.alphaNumeric.and(b.min(2).and(b.max(25))),
   email: b => b.custom((v, r) => console.log(v, r) == null && passed).and(b.email),
-  password: b => b.hasCapital.and(b.hasNumber).and(b.hasLetter),
+  password: b => b.required.and(b.hasCapital).and(b.hasNumber).and(b.hasLetter),
   passwordRepeat: b => b.required.and(b.equalTo('password'))
 })
 

@@ -15,6 +15,12 @@ export interface SyncRule<root, prop> {
      * @param r     the rule to compose with
      */
     or(r: SyncRule<root, prop>): SyncRule<root, prop>
+
+    /**
+     * Then composition for rules
+     * @param f     creates a rule based of the current state and combines this via an AND
+     */
+    then(f: (v: prop, r: root) => SyncRule<root, prop>): SyncRule<root, prop> 
     
     /**
      * Run this validator
@@ -51,6 +57,12 @@ export interface AsyncRule<root, prop> {
      * @param v     the value to validate
      */
     run: (v: prop, r: root) => Promise<Result>
+
+    /**
+     * Then composition for rules
+     * @param f     creates a rule based of the current state and combines this via an AND
+     */
+    then(f: (v: prop, r: root) => AsyncRule<root, prop>): AsyncRule<root, prop>
 }
 
 export type Rule<root, prop> = SyncRule<root, prop>| AsyncRule<root, prop>
@@ -98,7 +110,14 @@ export const rule = <root, prop>(p: (a:prop, r: root) => Result): SyncRule<root,
         })
     },
     async() {
-        return asyncRule(a => Promise.resolve(this.run(a)))
+        return asyncRule((a, r) => Promise.resolve(this.run(a, r)))
+    },
+    then(f) {
+        return rule((a, root) => {
+            const r1 = this.run(a, root)
+            if(r1.kind == 'failed') return r1
+            return f(a, root).run(a, root)
+        })
     }
 })
 
@@ -126,4 +145,12 @@ export const asyncRule = <root, prop>(p: (a:prop, r: root) => Promise<Result>): 
             return r.run(a, root)
         })
     },
+    then(f) {
+        const s: AsyncRule<root, prop> = this
+        return asyncRule<root, prop>(async (a, root) => {
+            const r1 = await s.run(a, root)
+            if(r1.kind == 'failed') return r1
+            return f(a, root).run(a, root)
+        })
+    }
 })

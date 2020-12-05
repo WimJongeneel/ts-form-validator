@@ -49,7 +49,7 @@ interface BaseFieldState<root, prop> {
 
 export type FieldState<root, prop> = BaseFieldState<root, prop> & (
     | { kind: 'unvalidated' }
-    | { kind: 'validating', job: () => Promise<Result> }
+    | { kind: 'validating' }
     | { kind: 'validated', result: Result })
 
 export interface TranslationOptions {
@@ -105,10 +105,12 @@ const unvalidated = <root, prop>(rule: SyncRule<root, prop>, field: keyof root, 
     rule,
     jobs: jobs,
     clear() {
-        return unvalidated(this.rule, this.field, {...this.jobs, next: () => passed})
+        return unvalidated(rule, this.field, {...this.jobs, next: async () => passed})
     },
     passed() {
-        return this.kind == 'validated' && this.result.kind == 'passed'
+        const self = this as FieldState<root, prop>
+
+        return self.kind == 'validated' && self?.result?.kind == 'passed'
     },
     validate(data: root, delay = 0, clearWhenValidating = false): FieldState<root, prop> {
         const self: FieldState<root, prop> = this
@@ -122,16 +124,25 @@ const unvalidated = <root, prop>(rule: SyncRule<root, prop>, field: keyof root, 
         }
 
 
-        if(delay == 0) return {
+        if(delay == 0 && clearWhenValidating) return {
             ...self,
-            kind: clearWhenValidating 
-                ? self.kind == 'unvalidated' ? 'validating' : this.kind
-                : 'validating',
+            kind: self.kind == 'unvalidated' ? 'validating' : this.kind,
             jobs: {
                 ...self.jobs,
                 next: async () => self.rule.run(field, data)
-            }
+            },
         }
+
+        if(delay == 0 && !clearWhenValidating) return {
+            ...self,
+            jobs: {
+                ...self.jobs,
+                next: async () => self.rule.run(field, data)
+            },
+        }
+
+        // todo: fix typing of this
+        const prop: prop = data[this.field] as any as prop
 
         return {
             ...this,
@@ -140,11 +151,11 @@ const unvalidated = <root, prop>(rule: SyncRule<root, prop>, field: keyof root, 
                 : 'validating',
             jobs: {
                 ...this.jobs,
-                next: () => new Promise(res => setTimeout(() => res(this.rule.run(data)), delay)).then(() => self.rule.run(field, data))
+                next: () => new Promise(res => setTimeout(() => res(this.rule.run(prop, data)), delay)).then(() => self.rule.run(field, data))
             }
         }
     },
-    field
+    field,
 })
 
 export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
@@ -152,7 +163,7 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
     const fields: Partial<{ [k in keyof a]: FieldState<a, a[k]> }> = {}
 
     for(const k in rules) {
-        fields[k] = unvalidated(rules[k](ruleBuilder() as any) as any, k, {})
+        fields[k] = unvalidated(rules[k]!(ruleBuilder() as any) as any, k, {})
     }
 
     return {
@@ -163,11 +174,13 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             const s: ValidatorState<a> = this
 
             for(const k in s.fields) {
-                if(s.fields[k].kind == 'validating') return 'validating'
+                if(s.fields[k] == undefined) continue
+                if(s.fields[k]!.kind == 'validating') return 'validating'
             }
 
             for(const k in s.fields) {
-                if(s.fields[k].kind != 'validated') return 'unvalidated'
+                if(s.fields[k] == undefined) continue
+                if(s.fields[k]!.kind != 'validated') return 'unvalidated'
             }
 
             return 'validated'
@@ -176,6 +189,7 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
         message(k, o = {}) {
             const s: ValidatorState<a> = this
             const data: FieldState<a, a[typeof k]> = s.fields[k] as any
+            if(data == undefined) return null
             if(data.kind != 'validated') return null
             if(data.result.kind == 'passed') return null
 
@@ -190,12 +204,12 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
 
             if(field != null) {
-                newS.fields[field] = newS.fields[field].validate(data, delay, clearWhenValidating)
+                newS.fields[field] = newS.fields[field]!.validate(data, delay, clearWhenValidating)
                 return newS
             }
 
             for(const k in newS.fields) {
-                newS.fields[k] = newS.fields[k].validate(data, delay, clearWhenValidating)
+                newS.fields[k] = newS.fields[k]!.validate(data, delay, clearWhenValidating)
             }
 
             return newS
@@ -203,15 +217,15 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
 
         error(k) {
             const s: ValidatorState<a> = this
-            const field = s.fields[k]
-
-            if(k != null) {
+            
+            if(k == undefined) {
                 for(const k in s.fields) {
-                    if(s.fields[k].passed() == false) return true
+                    if(s.fields[k]?.passed() == false) return true
                 }
                 return false
             }
-
+            
+            const field = s.fields[k]
             if(field == null) return false
             if(field.kind != 'validated') return false
             return !field.passed()
@@ -221,12 +235,12 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
 
             if(k) {
-                newS.fields[k] = newS.fields[k].clear()
+                newS.fields[k] = newS.fields[k]?.clear()
                 return newS
             }
 
             for(const k in newS.fields) {
-                newS.fields[k] = newS.fields[k].clear()
+                newS.fields[k] = newS.fields[k]?.clear()
             }
 
             return newS
