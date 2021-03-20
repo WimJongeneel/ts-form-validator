@@ -1,4 +1,3 @@
-import { faUndo } from "@fortawesome/free-solid-svg-icons"
 import React = require("react")
 import { Action, any, fromJSX, nothing, onlyIf, promise, Widget } from "widgets-for-react"
 import { FieldState, ValidatorState, Result } from "."

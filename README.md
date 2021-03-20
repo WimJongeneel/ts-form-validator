@@ -1,142 +1,168 @@
-# TypeScript Form Validator
+# The Validator Widget
 
-* **Initiative fluent interface for declaring rules**
-* **i18next intergration for simple rich validation messages**
-* **Immutable datastructure meant to be used in React applications**
-* **Type safe to reduce bugs and allow easy coding**
-* **Supports the different UI patterns with regards to form validation**
+> see the sample in the register widget for a fully working sample
 
-## Creating validators
+## State layout
 
-The `validator` function gets an object with the rules for the fields of the state as an argument. Note that the fields are optional, you don't have to define rules for all fields of your form. The rules are created with a lambda that gets a `RuleBuilder` as argument and returns a `Rule`. Rules can be composed with `and` and `or`. Which rules are aliviable on the `RuleBuilder` depends on the type of the field.
+When using the validator widget there are two things you have to keep in your state: the `FormData` and the `ValidatorState`. The `FormData` is the object that contains all the values of your field, this is the state you would always have when making a form. The `ValidatorState` holds the state of the validation. This state takes the type of the `FormData` as an argument. The `ValidatorState` will be initialized by the `validatorState` function from the widget library.
 
 ```ts
-const initValidatorState = validator<FormData>({
-  accept: b => b.is(true),
-  name: b => b.alphaNumeric.and(b.min(2).and(b.max(255))),
-  email: b => b.email
+// FormData
+interface RegisterFormData {
+  name: string
+  email: string
+  // more
+}
+
+// FormState
+interface RegisterState {
+  input: RegisterFormData
+  validations: ValidatorState<RegisterFormData>
+}
+
+// Initial FormState
+const initialRegisterState: RegisterState = ({ 
+  input: {
+    name: '',
+    email: '',
+    // more
+  },
+  validations: validateState,
+})
+```
+
+## Defining rules
+
+The validation rules are defined when creating the initial state for the validator. The `validatorState` function is responsible for initialising the `ValidatorState<FormData>` from an object with rules for each field in type `FormData`. The rules are defined by a lambda function from a `RuleBuilder` (specific for the type of the current field, e.g. `StringRuleBuilder`, `NumberRuleBuilder` or `DateRuleBuilder`) to `Rule<field>`. With this construction it is only possible to define correct rules and autocomplete will help you discover which rules exist for your field:
+
+```ts
+const validateState = validatorState<RegisterFormData>({
+  name: b => b.isRequired,
+  accept: b => b.isTrue
+})
+```
+
+### Combining rules
+
+- `and` combines two rules in the same way that `&&` combines two boolean expressions. If the first rule fails, that (failed) result is the final result. Otherwise, the result of the second rule is the result. Example: `b.isRequired.and(b.email)`.
+- `or` combines two rules in the same way that `||` combines two boolean expressions. If the first rule passes, that (passed) result is the final result. Otherwise, the result of the second rule is the result. Example: `b.isRequired.or(b.email)`.
+- `all` combines multiple rules via the `and` operator. The first rule to fail is the result of the combination. If no rules fail the combination passes. Example: `b.all(b.isRequired, b.email)`.
+- `any` combines multiple rules via the `or` operator. The first rule to pass is the result of the combination. If no rules passes the combination fails. Example: `b.any(b.isEmpty, b.email)`.
+
+```ts
+const validateState = validatorState<RegisterFormData>({
+  username: b => b.hasMinLength(3).and(b.isAlphaNumeric),
+  phone: b => b.isEmpty.or(b.isPhone),
+  password: b => b.all(b.isRequired, b.hasCapital, b.hasLetter, b.hasNumber, b.hasMinLength(8))
+})
+```
+
+### Async rules
+
+Rules can be async. Async rules can be created from a function `a => Promise<Result>` with the `fromPromise` function. Those rules can also be composed with other async rules by using `and` and `or`. Normal (sync) rules can be combined with async rules by calling `.async()` on the sync rule to convert them into async rules:
+
+```ts
+const validateState = validatorState<RegisterFormData>({
+  email: b => fromPromise(emailTaken),
+  email1: b => b.isRequired.and(b.isEmail).async().and(fromPromise(emailTaken)),
 })
 ```
 
 ### Optional fields
 
-In a form you can have fields that are optional, but if they are filled in they have to be validated. Examples for this are optional fields with a phonenummer or an email. To create a rule for this use the `or` operator with `empty` on the left and your rule on the rigth:
+An optional field which has a rule that has to be validated when the field is filled by the user (e.g. an optional phone field that has to be either empty or filled with a valid phone number) can be validated by combing the rule for the value with `isEmpty` via `or`. With this construction the field will either pass the empty rule or show the result of the right rule:
 
 ```ts
-b => b.empty.or(b.phone)
-```
-
-### Async rules
-
-Validation rules can also be async. An async rule is created the `asyncRule` function that takes a function `field -> Promise<Result>` as input.
-
-```ts
-b => asyncRule(emailTaken)
-```
-
-Async and sync rules can be composed by converting the sync rule to an async rule:
-
-```ts
-b => b.email.async().and(asyncRule(emailTaken))
-```
-
-### Combining collections of rules
-
-Sometimes you have a field that has to follow a lot of rules. In cases like this you can use `all` to quickly combine them togther: 
-
-```ts
-b => b.required.and(b.hasCapital).and(b.hasLetter).and(b.hasNumber).and(b.min(8))
-
-b => b.all(b.required, b.hasCapital, b.hasLetter, b.hasNumber, b.min(8))
+const validateState = validatorState<RegisterFormData>({
+  phone: b.isEmpty.or(b.isPhone)
+})
 ```
 
 ### Dynamic rules
 
-It is possible that a rule for a field depends on the state of the form. For example, a phone field can be optional or required based on if 2fa is enabled. In those situations you can use `pick` to pick the correct rule:
+Sometimes the rule that should be used depends on the state of the form. In cases like this you can use the `fromState` function to pick which rule should be used based on the current value of the state. E.g. a phone field that is only required when the user turned 2FA auth on:
 
 ```ts
-b => b.pick((_, form) => form.twoFactor ? b.required.and(b.phone) : b.empty.or(b.phone))
-```
-
-## Using validators
-
-Validators are meant to be used in the state of a (React) application. The value `validator` returns is the initial state of type `ValidatorState<>`. See the snippet below for an example on how to declare and initialize a state:
-
-```tsx
-interface FormState {
-    data: FormData,
-    validator: ValidatorState<FormData>
-}
-
-class Form extends React.Component<{}, FormState> {
-
-  state: FormState = {
-    validator: initValidatorState,
-    data: { accept: false, email: '', name: '' }
-  }
-}
-```
-
-The main method of the `ValidatorState` is `validate`. This method returns a new `ValidatorState` with the result of validating the provided data. The lambda shown below updates the state of the validation based on the new values: 
-```ts
-s => ({...s, validator: s.validator.validate(s.data)}
-```
-
-This can be used in the `onSubmit` of a form to validate all field when the form gets submitted:
-```tsx
-class Form extends React.Component<{}, FormState> {
-
-  render() {
-    return (
-      <form onSubmit={e => {
-        e.preventDefault()
-        this.setState(s => ({...s, validator: s.validator.validate(s.data)}))
-      }}>
-        <button type="submit">submit</button>
-      </form>
-    )
-  }
-}
-```
-
-Note that `validate` has an additional optional parameter for the fieldname. If this argument is given only that field will be validated. If it is omitted as in the example all fields will be validated. This is useful for validate-as-you-type forms.
-
-## Rendering messages
-
-The `ValidatorState` has a method `message` that gives an error message, translated by `i18next`. In `i18next` you van define a translation for each rule in the library and in those translations you will get an object will all the data of the rule and the validated data. The `error` method on the `ValidationState` will tell you if there is any error. If the method gets no arguments it will return if there is any error on any field. If you pass it a fieldname it will return if there is an error for that field.
-
-```ts
-i18next.init({
-  lng: 'en',
-  resources: {
-    en: {
-      translation: {
-        "alphaNumeric": "{{field}} must be alpa-numeric, '{{given}}' given",
-        "min": "{{field}} must be at least {{expected}} characters long, {{length}} given",
-        "max": "{{field}} must be max {{expected}} characters long, {{length}} given",
-        "email": "{{field}} is not an email"
-      }
-    }
-  }
+const validateState = validatorState<RegisterFormData>({
+  phone: b => b.fromState((phone, form) => form.twoFactor ? b.isRequired.and(b.isPhone) : b.isEmpty.or(b.isPhone)),
 })
 ```
 
-```tsx
-{this.state.validator.error('firstname') && <div>{this.state.validator.message('firstname')}</div>}
+> see `rule-builders.ts` for all the rules
+
+## Validating, rendering and labels
+
+To run the validator you call `validate` on the `ValidatorState` to get a new `ValidatorState`. This state will have the results of all the sync rules and the async rules will all be `validating`:
+
+```ts
+const registerUpdaters = {
+  submit: (register: RegisterState) => ({
+      ...register,
+      validations: register.validations.validate(register.input)
+    })
+}
 ```
 
-> todo:
-> - list all the labels and arguments
-> - translate the fieldnames
-> - allow i18next namespacing to be used
+There are two options you can give to validate: `field` and `delay`. `field` can be used to only validate one field of your state instead of everything. `delay` van be used to validate after a certain amount of time (in ms). The combination of those two can be used to create validate-as-you-stop-typing fields. This is demonstrated in the email field in the registerform sample:
 
-## Clearing errors
+```ts
+const registerUpdaters = {
+  email: (newValue: string): Updater<RegisterState> =>
+    register => ({ 
+      ...register, 
+      input: { ...register.input, email: newValue },
+      validations: register.validations.validate({ ...register.input, email: newValue }, 'email', 300)
+  })
+}
+```
 
-To clear all error you can call `clear` on the `ValidatorState` and get a validator state with no errors inside. Note that this state will return `true` for `error` as the validator hasn't ran yet. Alternatifly you can provide `clear` with a fieldname and it will then only clear the error of that field. This is very useful for clear-errors-as-you-type forms. If you call `validate` with no argument to validate all fields all existing errors will be cleared
+Rendering validation error is done with the `error`, `passes` and `message` methods on the `ValidatorState`. `error` and `passes` return booleans that indicate if a field has been validated and either failed or passed its rule. `message` return a string with the validation message if the field failed and `null` otherwise. The messages are created with `i18next`.
 
-## Examples
+```tsx
+<RegisterLayout.FormItemInGroup
+  controlId="name" 
+  name="Name"
+  value={currentState.input.name}
+  onChange={(newValue => setState(registerUpdaters.name(newValue)))}
+  error={currentState.validations.error('name')}
+  validation={currentState.validations.message('name')}
+/>
+```
 
-See `src/index.tsx` for a longer example. The example form has three fields, one gets validated on submit, one gets validated on typing and one gets validated on submit and clears on type. You can run the example by cloning this repro and using `yarn start`.
+The translation for a rule is looked up by the key `rule__[RULENAME]__[FIELDNAME]`. If this key is not found the translation is looked up by `rule__[RULENAME]`. The fieldnames provided in the translations data is first translated by the translation `label__[FIELDNAME]`. Note that `message` accepts an option object in which you can provide an additional namespace, override the translation key and add more argument data.
 
-> todo:
-> - document all rules for the different types
+```json
+{
+  "rule__alphaNumeric": "{{field}} must be alpa-numeric, '{{given}}' given",
+  "rule__min": "{{field}} must be at least {{expected}} characters long, {{length}} given",
+  "rule__max": "{{field}} must be max {{expected}} characters long, {{length}} given",
+  "rule__email": "{{field}} is not an email",
+  "rule__equalTo": "{{field}} should be equal to {{key}}",
+  "rule__hasCapital": "{{field}} should contain a capital",
+  "rule__hasLetter": "{{field}} should contain a lowercase letter",
+  "rule__hasNumber": "{{field}} should contain a number",
+  "rule__required": "{{field}} is required",
+  "rule__emailTaken": "{{given}} is already registered",
+  "rule__true__accept": "You have to accept our terms and conditions",
+  "rule__true": "{{field}} should be true",
+  "rule__phone": "{{field}} has to be a valid phone number",
+  "rule__empty": "{{field}} should be empty ",
+  "label__confirmPassword": "Confirm password",
+  "label__name": "Name",
+  "label__username": "Username",
+  "label__email": "Email",
+  "label__phone": "Phone",
+  "label__password": "Password"
+}
+```
+
+## The validator widget and async features
+
+The `validator` widget itself is responsible for managing all the async components of the library. It is important to always render a `validator` widget in your application when using the validator, otherwise some feature might not work. See the `registerWidget` for an full example.
+
+```tsx
+any<Updater<RegisterState>>()([  
+  validator(currentState.validations).map(registerUpdaters.validator),
+  fromJSX(/** your form widget */)
+])
+```

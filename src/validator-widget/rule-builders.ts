@@ -12,13 +12,21 @@ export interface StringRuleBuilder<root> {
      * Validates with the picked validator
      * @param f     the function that picks the rule
      */
-    pick(f: (v:string, root: root) => SyncRule<root, string>): SyncRule<root, string>
+    fromState(f: (v:string, root: root) => SyncRule<root, string>): SyncRule<root, string>
 
     /**
-     * Validates with a custom function
-     * @param f     the custom validator function
+     * Validates if all rules matched
+     * @param r     the first rule
+     * @param rs    the rest of the rules
      */
     all(r:SyncRule<root, string>, ...rs: SyncRule<root, string>[]): SyncRule<root, string>
+
+    /**
+     * Validates if any rule matches
+     * @param r     the first rule
+     * @param rs    the rest of the rules
+     */
+    any(r:SyncRule<root, string>, ...rs: SyncRule<root, string>[]): SyncRule<root, string>
     
     /**
      * Validates if this value is equal to another field in a
@@ -29,7 +37,7 @@ export interface StringRuleBuilder<root> {
     /**
      * Validates if the field is non-empty
      */
-    required: SyncRule<root, string>
+    isRequired: SyncRule<root, string>
    
     /**
      * Validates if the value is equal to the provided value
@@ -41,27 +49,13 @@ export interface StringRuleBuilder<root> {
      * Validates if the value has a min length
      * @param n     the min length
      */
-    min(n: number): SyncRule<root, string>
+    hasMinLength(n: number): SyncRule<root, string>
     
     /**
      * Validates if the value is below a max length
      * @param n     the max length
      */
-    max(n: number): SyncRule<root, string>
-    
-    /**
-     * Validates if the value contains a certain string
-     * @param s     the string to test with
-     * @param c     flag to indicate case sensitifity
-     */
-    contains(s: string, c?: boolean): SyncRule<root, string>
-    
-    /**
-     * Validates if the value does not contain a certain string
-     * @param s     the string to test with
-     * @param c     flag to indicate case sensitifity
-     */
-    containsNot(s: string, c?: boolean): SyncRule<root, string>
+    hasMaxLength(n: number): SyncRule<root, string>
     
     /**
      * Validates if the value contains a number
@@ -106,48 +100,48 @@ export interface StringRuleBuilder<root> {
      * Validates if the value has a certain length
      * @param n     the length of the value
      */
-    length(n: number): SyncRule<root, string>
+    hasLength(n: number): SyncRule<root, string>
 
     /**
      * Validates if the value is an email
      */
-    email: SyncRule<root, string>
+    isEmail: SyncRule<root, string>
 
     /**
      * Validates if the value is a valid url
      */
-    url: SyncRule<root, string>
+    isUrl: SyncRule<root, string>
 
     /**
      * Validates if the value only consists of alpha chars
      */
-    alpha: SyncRule<root, string>
+    isAlpha: SyncRule<root, string>
 
     /**
      * Validates if the value only consists of numeric chars
      */
-    numeric: SyncRule<root, string>
+    isNumeric: SyncRule<root, string>
 
     /**
      * Validates if the value only consists of alpha and numeric chars
      */
-    alphaNumeric: SyncRule<root, string>
+    isAlphaNumeric: SyncRule<root, string>
 
     /**
      * Validates if the value matches a certain reges
      * @param r     the regex to test the value against
      */
-    regex(r: RegExp): SyncRule<root, string>
+    matchesRegex(r: RegExp): SyncRule<root, string>
 
     /**
      * Validates if the value is empty
      */
-    empty: SyncRule<root, string>
+    isEmpty: SyncRule<root, string>
 
     /**
      * Validates if the value is a valid phone number
      */
-    phone: SyncRule<root, string>
+    isPhone: SyncRule<root, string>
 }
 
 export interface DateRuleBuilder<root> {
@@ -188,32 +182,18 @@ export interface DateRuleBuilder<root> {
      * @param d     the date to compare with
      */
     beforeOr(d: Date): SyncRule<root, Date>
-
-    /**
-     * Validates if the value is between or equal to two given dates
-     * @param d1    the first date
-     * @param d2    the second date
-     */
-    betweenIncuding(d1: Date, d2: Date): SyncRule<root, Date>
-
-    /**
-     * Validates if the value is between and not equal to two given dates
-     * @param d1    the first date
-     * @param d2    the second date
-     */
-    between(d1: Date, d2: Date): SyncRule<root, Date>
 }
 
 export interface BoolRuleBuilder<root> {
     /**
      * Validates if the value is true
      */
-    true: SyncRule<root, boolean>
+    isTrue: SyncRule<root, boolean>
 
     /**
      * validates is the value is false
      */
-    false: SyncRule<root, boolean>
+    isFalse: SyncRule<root, boolean>
 
     /**
      * Validates if the value is equal to the given boolean
@@ -277,25 +257,27 @@ export const ruleBuilder: <root>() => DateRuleBuilder<root> & StringRuleBuilder<
     
     all:(...r) => r.reduce((v, c) => v.and(c)),
 
+    any:(...r) => r.reduce((v, c) => v.or(c)),
+
     is:(v:any) => rule<any, any>(a => v == a ? passed : failed('is', {expected: v, given: a, kind: 'is'})),
 
-    max:(n:number) => rule((a:string) => n >= a.length ? passed : failed('max', {expected: n, given: a, length: a.length})),
+    hasMaxLength:(n:number) => rule((a:string) => n >= a.length ? passed : failed('max', {expected: n, given: a, length: a.length})),
 
-    min:(n:number) => rule((a:string) => n <= a.length ? passed : failed('min', {expected: n, given: a, length: a.length,})),
+    hasMinLength:(n:number) => rule((a:string) => n <= a.length ? passed : failed('min', {expected: n, given: a, length: a.length,})),
 
     hasCapital: rule((a:string) => a.toLocaleLowerCase() != a ? passed : failed('hasCapital', {given: a})),
 
-    alphaNumeric: rule((a:string) => /^[a-zA-Z0-9]+$/i.test(a) ? passed : failed('alphaNumeric', {given: a})),
+    isAlphaNumeric: rule((a:string) => /^[a-zA-Z0-9]+$/i.test(a) ? passed : failed('alphaNumeric', {given: a})),
 
     oneOf:(...vs: any[]) => rule<any, any>(a => vs.some(v => v == a) ? passed :failed('oneOf', {given: a, expected: vs.join(', ')})),
 
-    required: rule(a => (a || '').length > 0 ? passed : failed('required')),
+    isRequired: rule(a => (a || '').length > 0 ? passed : failed('required')),
 
-    false: rule(b => b === false ? passed : failed('false')),
+    isFalse: rule(b => b === false ? passed : failed('false')),
 
-    true: rule(b => b === true ? passed : failed('true')),
+    isTrue: rule(b => b === true ? passed : failed('true')),
 
-    email: rule((e:string) => e.includes('@') ? passed : failed('email', {given: e})),
+    isEmail: rule((e:string) => e.includes('@') ? passed : failed('email', {given: e})),
 
     // todo: date rendering for render data
     after: d => rule(v => d > v ? passed : failed('after', { kind: 'after'})),
@@ -314,7 +296,7 @@ export const ruleBuilder: <root>() => DateRuleBuilder<root> & StringRuleBuilder<
 
     lesserOr: n => rule(v => v > n ? passed : failed('lesserOr', { kind: 'lesserOr', given: v})),
 
-    length: n => rule(v => (v || '').length == n ? passed : failed('length', {kind: 'length', given: (v || '').length, expected: n})),
+    hasLength: n => rule(v => (v || '').length == n ? passed : failed('length', {kind: 'length', given: (v || '').length, expected: n})),
 
     endsWith: s => rule(v => (v || '').endsWith(s) ? passed: failed('endswith', { kind: 'endswith', given: v, expected: s})),
 
@@ -324,33 +306,25 @@ export const ruleBuilder: <root>() => DateRuleBuilder<root> & StringRuleBuilder<
 
     startsNotWith: s => rule(v => !(v || '').startsWith(s) ? passed: failed('startsNotWith', { kind: 'startsNotWith', given: v, expected: s})),
 
-    regex: r => rule(v => r.test(v) ? passed : failed('regex', {kind: 'regex', given: v})),
+    matchesRegex: r => rule(v => r.test(v) ? passed : failed('regex', {kind: 'regex', given: v})),
 
-    alpha: rule(a => /^[a-zA-Z]+$/i.test(a) ? passed : failed('alpha', {kind: 'alpha', given: a})),
+    isAlpha: rule(a => /^[a-zA-Z]+$/i.test(a) ? passed : failed('alpha', {kind: 'alpha', given: a})),
 
-    numeric: rule(a => /^[0-9]+$/i.test(a) ? passed : failed('numeric', {kind: 'numeric',given: a})),
+    isNumeric: rule(a => /^[0-9]+$/i.test(a) ? passed : failed('numeric', {kind: 'numeric',given: a})),
 
     hasNumber: rule(a => /[0-9]/.test(a) ? passed : failed('hasNumber', {kind: 'hasNumber',given: a})),
 
     hasLetter: rule(a => /[a-z]/.test(a) ? passed : failed('hasLetter', {kind: 'hasLetter',given: a})),
 
-    url: rule(v => ((v || '').startsWith('http://') || (v || '').startsWith('https://')) && (v || '').includes('.') ? passed : failed('url', {kind: 'url',given: v})),
-
-    between: null!,
-
-    betweenIncuding: null!,
-
-    contains: null!,
-
-    containsNot: null!,
+    isUrl: rule(v => ((v || '').startsWith('http://') || (v || '').startsWith('https://')) && (v || '').includes('.') ? passed : failed('url', {kind: 'url',given: v})),
 
     equalTo: (k) => rule((a, r) => (a as any) === r[k] ? passed : failed('equalTo', {kind: 'equalTo', given: a, key: k, other: r[k]})),
 
     custom: (f) => rule(f),
 
-    empty: rule(a => (a || '').length == 0 ? passed : failed('empty')),
+    isEmpty: rule(a => (a || '').length == 0 ? passed : failed('empty')),
 
-    phone: rule(a => /^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$/g.test(a) ? passed : failed('phone')),
+    isPhone: rule(a => /^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$/g.test(a) ? passed : failed('phone')),
 
-    pick: f => rule((a, r) => f(a, r).run(a, r))
+    fromState: f => rule((a, r) => f(a, r).run(a, r))
 })
