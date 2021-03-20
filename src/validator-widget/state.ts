@@ -93,6 +93,12 @@ export interface ValidatorState<root> {
     error(field?: keyof root): boolean
 
     /**
+     * Get of there is any validation error in this validator
+     * @param field  optional, when specified only the state of this field will be considered
+     */
+    passed(field?: keyof root): boolean
+
+    /**
      * Clears the errors of this validator
      * @param field     optional, when specified only this field will be cleared
      */
@@ -112,7 +118,7 @@ const unvalidated = <root, prop>(rule: SyncRule<root, prop>, field: keyof root, 
 
         return self.kind == 'validated' && self?.result?.kind == 'passed'
     },
-    validate(data: root, delay = 0, clearWhenValidating = false): FieldState<root, prop> {
+    validate(data: root, delay = 0, clearWhenValidating = true): FieldState<root, prop> {
         const self: FieldState<root, prop> = this
 
         const field = (data as any)[self.field]
@@ -126,7 +132,7 @@ const unvalidated = <root, prop>(rule: SyncRule<root, prop>, field: keyof root, 
 
         if(delay == 0 && clearWhenValidating) return {
             ...self,
-            kind: self.kind == 'unvalidated' ? 'validating' : this.kind,
+            kind: 'validating',
             jobs: {
                 ...self.jobs,
                 next: async () => self.rule.run(field, data)
@@ -142,13 +148,12 @@ const unvalidated = <root, prop>(rule: SyncRule<root, prop>, field: keyof root, 
         }
 
         // todo: fix typing of this
+        // @ts-ignore
         const prop: prop = data[this.field] as any as prop
 
         return {
             ...this,
-            kind: clearWhenValidating 
-                ? this.kind == 'unvalidated' ? 'validating' : this.kind
-                : 'validating',
+            kind: clearWhenValidating ? 'validating' : this.kind,
             jobs: {
                 ...this.jobs,
                 next: () => new Promise(res => setTimeout(() => res(this.rule.run(prop, data)), delay)).then(() => self.rule.run(field, data))
@@ -193,14 +198,19 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             if(data.kind != 'validated') return null
             if(data.result.kind == 'passed') return null
 
-            const renderData = {...data.result.data, field: k, kind: data.result.name, ...(o.data || {})}
+            const renderData = {
+                ...data.result.data, 
+                field: i18next.default.exists('label__'+ k ) ? i18next.default.t('label__'+ k ) : k, 
+                kind: data.result.name, 
+                ...(o.data || {})
+            }
 
             if(o.key) return i18next.default.t(`${o.ns ? o.ns + ':' : ''}${o.key}`, renderData)
-            if(i18next.default.exists(`${o.ns ? o.ns + ':' : ''}${data.result.name}__${k}`)) return i18next.default.t(`${data.result.name}__${k}`, renderData)
-            return i18next.default.t(`${o.ns ? o.ns + ':' : ''}${data.result.name}`, renderData)
+            if(i18next.default.exists(`${o.ns ? o.ns + ':' : ''}rule__${data.result.name}__${k}`)) return i18next.default.t(`${o.ns ? o.ns + ':' : ''}rule__${data.result.name}__${k}`, renderData)
+            return i18next.default.t(`${o.ns ? o.ns + ':' : ''}rule__${data.result.name}`, renderData)
         },
 
-        validate(data: a, field, delay, clearWhenValidating) {
+        validate(data: a, field, delay, clearWhenValidating = true) {
             const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
 
             if(field != null) {
@@ -231,6 +241,21 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
             return !field.passed()
         },
 
+        passed(k) {
+            const s: ValidatorState<a> = this
+            
+            if(k == undefined) {
+                for(const k in s.fields) {
+                    if(s.fields[k]?.passed() == false) return false
+                }
+                return true
+            }
+            
+            const field = s.fields[k]
+            if(field == null) return true
+            return field.passed()
+        },
+
         clear(k) {
             const newS: ValidatorState<a> = {...this, fields: {...this.fields}}
 
@@ -247,5 +272,3 @@ export const validatorState = <a = {}>(rules: Rules<a>): ValidatorState<a> => {
         }
     }
 }
-
-

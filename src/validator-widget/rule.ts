@@ -110,7 +110,7 @@ export const rule = <root, prop>(p: (a:prop, r: root) => Result): SyncRule<root,
         })
     },
     async() {
-        return asyncRule((a, r) => Promise.resolve(this.run(a, r)))
+        return fromPromise((a, r) => Promise.resolve(this.run(a, r)))
     },
     then(f) {
         return rule((a, root) => {
@@ -125,12 +125,12 @@ export const rule = <root, prop>(p: (a:prop, r: root) => Result): SyncRule<root,
  * Constructs an async rule from an async predicate
  * @param p     the predicate that returns its result as a Promise of the Result type
  */
-export const asyncRule = <root, prop>(p: (a:prop, r: root) => Promise<Result>): AsyncRule<root, prop> => ({
+export const fromPromise = <root, prop>(p: (a:prop, r: root) => Promise<Result>): AsyncRule<root, prop> => ({
     kind: 'async-rule',
     run: p,
     and(r) {
         const s: AsyncRule<root, prop> = this
-        return asyncRule(async(a, root) => {
+        return fromPromise(async(a, root) => {
             const r1 = await s.run(a, root)
             if(r1.kind == 'failed') return r1
             return r.run(a, root)
@@ -139,7 +139,7 @@ export const asyncRule = <root, prop>(p: (a:prop, r: root) => Promise<Result>): 
     or(r) {
         const s: AsyncRule<root, prop> = this
 
-        return asyncRule(async (a, root) => {
+        return fromPromise(async (a, root) => {
             const r1 = await s.run(a, root)
             if(r1.kind == 'passed') return r1
             return r.run(a, root)
@@ -147,7 +147,7 @@ export const asyncRule = <root, prop>(p: (a:prop, r: root) => Promise<Result>): 
     },
     then(f) {
         const s: AsyncRule<root, prop> = this
-        return asyncRule<root, prop>(async (a, root) => {
+        return fromPromise<root, prop>(async (a, root) => {
             const r1 = await s.run(a, root)
             if(r1.kind == 'failed') return r1
             return f(a, root).run(a, root)
